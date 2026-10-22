@@ -20,5 +20,6 @@ flowchart LR
 
 ## Limits
 
+- node-exporter runs on the pod network (not host network) so port 9100 is not exposed to the LAN. Host NIC metrics are therefore not available.
 - No Alertmanager, so alerts show in the Prometheus/Grafana UI and do not notify you. Add it with a receiver (e.g. Telegram or email) later.
 - Untested: the `/srv` mountpoint label in the disk rule may differ inside node-exporter's container.

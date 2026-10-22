@@ -32,6 +32,11 @@ grafana:
     limits: {memory: 400Mi}
 
 prometheus-node-exporter:
+  # Chart default is hostNetwork: true, which listens on every host interface
+  # (port 9100, no auth) and would expose host metrics to the LAN. Pod network
+  # keeps it cluster-internal. Cost: network-interface metrics describe the pod,
+  # not the host NICs; we alert on disk, swap and backup age only.
+  hostNetwork: false
   # Reads the backup success metric written by platform/backup/backup.sh.
   extraArgs:
     - --collector.textfile.directory=/host/textfile
