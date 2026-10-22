@@ -1,0 +1,12 @@
+[Unit]
+Description=Nightly Immich backup to external drive (restic)
+After=k3s.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/homelab/backup.sh
+# Keep the desktop responsive while restic reads the library.
+# restic needs a cache dir; systemd provides one and exports $CACHE_DIRECTORY.
+CacheDirectory=restic
+Nice=10
+IOSchedulingClass=idle

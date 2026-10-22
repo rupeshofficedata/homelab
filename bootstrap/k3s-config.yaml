@@ -1,0 +1,19 @@
+# k3s server config. 05-k3s.sh renders @HOMELAB_ROOT@ from config.env and
+# installs this as /etc/rancher/k3s/config.yaml.
+
+# All cluster state and volumes on /srv (own subvolume, outside snapper).
+data-dir: @HOMELAB_ROOT@/k3s
+default-local-storage-path: @HOMELAB_ROOT@/storage
+
+# Not needed: Tailscale (`tailscale serve`) fronts the apps. Saves RAM.
+disable:
+  - traefik
+  - servicelb
+
+# Kubeconfig readable by root only; 05-k3s.sh copies it to the user.
+write-kubeconfig-mode: "0600"
+
+# NodePorts listen on loopback only. Apps are published to the tailnet through
+# `tailscale serve`, never to the LAN.
+kube-proxy-arg:
+  - nodeport-addresses=127.0.0.0/8

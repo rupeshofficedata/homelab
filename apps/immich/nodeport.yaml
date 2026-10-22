@@ -1,0 +1,15 @@
+# Entry point for `tailscale serve`. NodePort 30283 is bound to loopback only
+# (kube-proxy nodeport-addresses in bootstrap/k3s-config.yaml), so the LAN
+# cannot reach it; only tailscaled on this host can, and it serves the tailnet.
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-server-nodeport
+  namespace: immich
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: server
+    app.kubernetes.io/instance: immich
+  ports:
+    - {port: 2283, targetPort: 2283, nodePort: 30283}

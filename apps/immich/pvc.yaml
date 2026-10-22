@@ -1,0 +1,13 @@
+# Photo/video library. k3s local-path creates the directory under
+# /srv/homelab/storage (copy-on-write disabled there). local-path does not
+# enforce the size; it documents intent and caps nothing.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: immich-library
+  namespace: immich
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 150Gi

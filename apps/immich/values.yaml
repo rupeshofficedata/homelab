@@ -1,0 +1,40 @@
+# Helm values for the official Immich chart (only overrides; chart defaults stay).
+# Chart: oci://ghcr.io/immich-app/immich-charts/immich, version pinned in install.sh.
+
+controllers:
+  main:
+    containers:
+      main:
+        image:
+          tag: v3.2.0   # Immich version; chart does not auto-update. Bump deliberately.
+
+immich:
+  persistence:
+    library:
+      existingClaim: immich-library   # PVC from pvc.yaml
+
+valkey:
+  enabled: true   # Immich's cache/queue (Redis-compatible); data is disposable
+
+server:
+  controllers:
+    main:
+      containers:
+        main:
+          env:
+            DB_HOSTNAME: {valueFrom: {secretKeyRef: {name: immich-db, key: host}}}
+            DB_USERNAME: {valueFrom: {secretKeyRef: {name: immich-db, key: user}}}
+            DB_PASSWORD: {valueFrom: {secretKeyRef: {name: immich-db, key: password}}}
+            DB_DATABASE_NAME: {valueFrom: {secretKeyRef: {name: immich-db, key: dbname}}}
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {memory: 2Gi}
+
+machine-learning:
+  controllers:
+    main:
+      containers:
+        main:
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {memory: 2Gi}   # RAM guard: face/search models can balloon

@@ -1,0 +1,5 @@
+# Namespace for everything Immich: server, ML, valkey, Postgres, library volume.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: immich

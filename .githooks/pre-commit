@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# pre-commit: stop secrets from reaching the PUBLIC repo.
+# Enabled by `git config core.hooksPath .githooks` (already set by `git init` step).
+# Checks, in order: (1) staged secrets/*.yaml are SOPS-encrypted,
+# (2) gitleaks finds no plaintext secrets, (3) staged shell scripts parse.
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+staged() { git diff --cached --name-only --diff-filter=ACM -- "$@"; }
+fail=0
+
+# 1. Encrypted-only: a SOPS file always has a top-level `sops:` key.
+#    Read the STAGED blob (git show :path), not the working tree.
+while IFS= read -r f; do
+  git show ":$f" | grep -q '^sops:' || { echo "NOT ENCRYPTED: $f (run: sops -e -i $f)" >&2; fail=1; }
+done < <(staged 'secrets/*.yaml' 'secrets/*.yml')
+
+# 2. Generic secret scan. Required: the repo is public, so no scanner = no commit.
+command -v gitleaks >/dev/null || { echo "gitleaks missing: sudo pacman -S gitleaks" >&2; exit 1; }
+if gitleaks git --help >/dev/null 2>&1; then gitleaks git --staged --redact || fail=1
+else gitleaks protect --staged --redact || fail=1; fi   # older gitleaks
+
+# 3. Syntax check staged shell scripts.
+while IFS= read -r f; do bash -n "$f" || fail=1; done < <(staged '*.sh' '.githooks/*')
+
+exit "$fail"

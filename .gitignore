@@ -1,0 +1,13 @@
+# Public repo: only SOPS-encrypted secrets may be committed.
+*.dec.yaml
+*.dec.yml
+age.key
+keys.txt
+*.agekey
+.env
+kubeconfig*
+
+# Local state and tooling
+.cache/
+.remember/
+*.log

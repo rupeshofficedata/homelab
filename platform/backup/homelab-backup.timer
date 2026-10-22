@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Immich backup nightly
+
+[Timer]
+OnCalendar=*-*-* 02:30:00
+# Run at next boot if the PC was off at 02:30.
+Persistent=true
+RandomizedDelaySec=10m
+
+[Install]
+WantedBy=timers.target

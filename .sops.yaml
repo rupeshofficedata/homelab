@@ -1,0 +1,8 @@
+# SOPS rules. Public repo: the age PUBLIC key below is safe to commit.
+# 04-secrets.sh replaces the placeholder with the key it generates.
+creation_rules:
+  # Only files under secrets/ named *.enc.yaml are encrypted by SOPS.
+  - path_regex: secrets/.*\.enc\.ya?ml$
+    # Encrypt values only under data/stringData; names and metadata stay readable.
+    encrypted_regex: ^(data|stringData)$
+    age: age1g9zm8rh0ukd04kk6ku0j485vpw8gdjndl3l7vnuafp4s83njp5qsqkmelr

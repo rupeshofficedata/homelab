@@ -1,0 +1,55 @@
+# Postgres for Immich. The chart does not ship a database, and Immich needs the
+# vectorchord extension. This is the image Immich's own docker-compose uses,
+# pinned by digest. One pod, one volume: no operator needed at this scale.
+# Credentials come from the SOPS-managed Secret `immich-db` (see install.sh).
+apiVersion: v1
+kind: Service
+metadata:
+  name: immich-postgres
+  namespace: immich
+spec:
+  selector: {app: immich-postgres}
+  ports:
+    - {port: 5432, targetPort: 5432}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: immich-postgres
+  namespace: immich
+spec:
+  serviceName: immich-postgres
+  replicas: 1
+  selector:
+    matchLabels: {app: immich-postgres}
+  template:
+    metadata:
+      labels: {app: immich-postgres}
+    spec:
+      containers:
+        - name: postgres
+          image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0@sha256:bcf63357191b76a916ae5eb93464d65c07511da41e3bf7a8416db519b40b1c23
+          env:
+            - {name: POSTGRES_USER, valueFrom: {secretKeyRef: {name: immich-db, key: user}}}
+            - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: immich-db, key: password}}}
+            - {name: POSTGRES_DB, valueFrom: {secretKeyRef: {name: immich-db, key: dbname}}}
+            - {name: POSTGRES_INITDB_ARGS, value: "--data-checksums"}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+          ports:
+            - {containerPort: 5432}
+          readinessProbe:
+            exec: {command: [sh, -c, "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1Gi}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi
