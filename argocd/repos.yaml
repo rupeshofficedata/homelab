@@ -1,0 +1,14 @@
+# Lets Argo CD pull Helm charts from the GHCR OCI registry (public, no credentials).
+# The monitoring chart uses a normal Helm repo and needs no entry.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-ghcr-immich
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+stringData:
+  type: helm
+  name: ghcr-immich
+  url: ghcr.io/immich-app/immich-charts
+  enableOCI: "true"

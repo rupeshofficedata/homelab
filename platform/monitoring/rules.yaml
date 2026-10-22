@@ -1,0 +1,23 @@
+# Alerts. No Alertmanager yet, so check them in Prometheus (Alerts tab) or Grafana.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: homelab
+  namespace: monitoring
+spec:
+  groups:
+    - name: homelab
+      rules:
+        - alert: BackupStale
+          # 26 h = a nightly run plus slack. Fires if the metric is missing too.
+          expr: (time() - homelab_backup_last_success_timestamp_seconds > 93600) or absent(homelab_backup_last_success_timestamp_seconds)
+          for: 10m
+          annotations: {summary: "No successful Immich backup in 26 h (drive unplugged? check journalctl -u homelab-backup)"}
+        - alert: SrvDiskAlmostFull
+          expr: 1 - node_filesystem_avail_bytes{mountpoint="/srv"} / node_filesystem_size_bytes{mountpoint="/srv"} > 0.8
+          for: 15m
+          annotations: {summary: "/srv above 80% full"}
+        - alert: HighSwapUse
+          expr: 1 - node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes > 0.5
+          for: 30m
+          annotations: {summary: "Swap above 50% for 30 min: RAM pressure (kill criterion: Compose fallback)"}

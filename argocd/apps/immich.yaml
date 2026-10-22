@@ -1,0 +1,28 @@
+# Immich = official chart (OCI) + our values + our extra manifests, all from this repo.
+# prune is OFF: a mistaken commit must never delete the photo library volume.
+# The DB Secret `immich-db` is NOT managed here (created by apps/immich/install.sh).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: immich
+  namespace: argocd
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: immich}
+  sources:
+    - repoURL: ghcr.io/immich-app/immich-charts
+      chart: immich
+      targetRevision: 0.13.4          # keep in step with CHART_VERSION in apps/immich/install.sh
+      helm:
+        releaseName: immich
+        valueFiles: [$values/apps/immich/values.yaml]
+    - repoURL: https://github.com/rupeshofficedata/homelab.git
+      targetRevision: main
+      ref: values
+    - repoURL: https://github.com/rupeshofficedata/homelab.git
+      targetRevision: main
+      path: apps/immich
+      directory: {include: "{pvc,postgres,nodeport}.yaml"}
+  syncPolicy:
+    automated: {prune: false, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

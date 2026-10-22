@@ -29,4 +29,9 @@ restic forget --host homelab --tag immich --keep-daily 7 --keep-weekly 4 --keep-
 [[ $(date +%u) != 7 ]] || restic check --read-data-subset=5%
 
 # 5. Success stamp for monitoring (Phase 1b alerts on its age).
-mkdir -p "$STATE_DIR" && date +%s > "$STATE_DIR/last-backup-success"
+# The .prom file is read by node-exporter's textfile collector (Phase 1b alert BackupStale).
+mkdir -p "$STATE_DIR"
+now=$(date +%s)
+echo "$now" > "$STATE_DIR/last-backup-success"
+echo "homelab_backup_last_success_timestamp_seconds $now" > "$STATE_DIR/homelab_backup.prom.tmp"
+mv "$STATE_DIR/homelab_backup.prom.tmp" "$STATE_DIR/homelab_backup.prom"

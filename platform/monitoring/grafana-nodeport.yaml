@@ -1,0 +1,14 @@
+# Entry point for `tailscale serve --bg --tcp 3000 tcp://127.0.0.1:30300`.
+# NodePorts are loopback-only (see bootstrap/k3s-config.yaml), so the LAN cannot reach it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-nodeport
+  namespace: monitoring
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/instance: monitoring
+  ports:
+    - {port: 3000, targetPort: 3000, nodePort: 30300}

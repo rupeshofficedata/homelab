@@ -1,0 +1,39 @@
+# kube-prometheus-stack overrides. Tuned small: this PC also runs the photo library.
+
+alertmanager:
+  enabled: false   # no receivers configured; alerts are visible in Prometheus/Grafana only
+
+# k3s embeds these control-plane parts, so the default scrape targets would just fail.
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}
+kubeEtcd: {enabled: false}
+
+prometheus:
+  prometheusSpec:
+    retention: 7d
+    ruleSelectorNilUsesHelmValues: false   # pick up our PrometheusRule without chart labels
+    resources:
+      requests: {cpu: 100m, memory: 400Mi}
+      limits: {memory: 1Gi}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources: {requests: {storage: 10Gi}}
+
+grafana:
+  admin:
+    existingSecret: grafana-admin   # created by argocd/install.sh from secrets/grafana-admin.enc.yaml
+    userKey: admin-user
+    passwordKey: admin-password
+  resources:
+    requests: {cpu: 50m, memory: 150Mi}
+    limits: {memory: 400Mi}
+
+prometheus-node-exporter:
+  # Reads the backup success metric written by platform/backup/backup.sh.
+  extraArgs:
+    - --collector.textfile.directory=/host/textfile
+  extraHostVolumeMounts:
+    - {name: textfile, hostPath: /var/lib/homelab, mountPath: /host/textfile, readOnly: true}
