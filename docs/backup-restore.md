@@ -89,7 +89,7 @@ Backup last success older than 26 hours (from `last-backup-success`). Drive not 
 | Timer's first scheduled run | **Not yet verified** |
 | Restore drill with real photos | Verified 2026-10-22: 8 photos, restored files identical by sha256, DB dump restored into a scratch database (8 assets) |
 | Unplugged-drive test (job fails, SSD usage unchanged) | Verified 2026-10-22: drive unmounted, job exits 1, SSD usage delta 0, mountpoint rejects writes |
-| Reboot test (k3s, automount, tailscaled return on their own) | **Not yet verified** |
+| Reboot test (k3s, automount, tailscaled return on their own) | Verified 2026-10-22: all 9 post-reboot checks passed |
 
 ## Known weaknesses
 
