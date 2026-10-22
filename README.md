@@ -3,7 +3,7 @@
 Self-hosted photo backup and personal cloud, run as code. Started with **iPhone photos → Immich → nightly encrypted backup to an external drive**, built so the whole setup moves to another PC with `git clone` + a key + the drive.
 
 > [!NOTE]
-> **Status: Phase 0 applied; Phase 1a built (Immich on k3s, reachable on the tailnet, nightly restic backup to the external drive).** First manual backup and a mechanical restore drill passed. **Still unverified:** upload from the iPhone (it is not on the tailnet yet and the app's `http://` support is untested), restore with real photos, reboot test, unplugged-drive test, the timer's first scheduled run. The pre-commit hook blocks an unencrypted secret and passes a clean tree (tested). Not yet done: age key copy in a cloud password manager, GitHub repo, first commit. Anything marked *Planned* in the docs is design, not tested behaviour.
+> **Status: Phase 0 applied; Phase 1a built (Immich on k3s, reachable on the tailnet, nightly restic backup to the external drive).** First manual backup and a mechanical restore drill passed. **Verified with 8 real photos:** backup run (37 MiB snapshot), restore into a scratch dir (checksums identical to live) and DB restore into a scratch database (8 assets), unplugged-drive test (job fails, SSD unchanged). **Still unverified:** reboot test, the timer's first scheduled run. Not yet done: age key copy in a cloud password manager, GitHub repo, first commit. Anything marked *Planned* in the docs is design, not tested behaviour.
 
 ## Architecture
 
