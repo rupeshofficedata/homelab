@@ -47,5 +47,6 @@ if [[ $APPLY == 1 ]]; then
 fi
 
 # 3. Repo credentials for the OCI chart, then the root app: Argo takes over from here.
+run kubectl apply -f "$HERE/project-default.yaml"
 run kubectl apply -f "$HERE/repos.yaml"
 run kubectl apply -f "$HERE/root-app.yaml"

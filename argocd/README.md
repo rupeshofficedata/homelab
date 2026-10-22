@@ -1,6 +1,6 @@
 # argocd/
 
-GitOps entry point. **Prepared, not applied** (Phase 1b). Applying it while a large photo upload is running would compete for RAM, so it waits.
+GitOps entry point (Phase 1b). Applied after the photo upload finished.
 
 Argo CD watches this repository on GitHub and makes the cluster match it. One root `Application` creates one `Application` per file in `apps/`.
 
@@ -18,6 +18,7 @@ flowchart LR
 |---|---|
 | `install.sh` | Installs Argo CD core, creates the Grafana secret (SOPS), applies `repos.yaml` and the root app. Dry run unless `APPLY=1`. Refuses if git has unpushed changes. |
 | `repos.yaml` | Registers the GHCR OCI registry so Argo can pull the Immich chart. |
+| `project-default.yaml` | The `default` AppProject. Core install lacks the API server that creates it. |
 | `root-app.yaml` | App-of-apps root, pointed at `argocd/apps/`. |
 | `apps/immich.yaml` | Immich: official chart + `apps/immich/values.yaml` + `pvc`, `postgres`, `nodeport` manifests. `prune: false` so a bad commit cannot delete the photo volume. |
 | `apps/monitoring.yaml` | Prometheus + Grafana chart + `platform/monitoring/` values, alert rules, Grafana entry point. |
