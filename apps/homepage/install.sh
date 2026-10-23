@@ -29,9 +29,6 @@ stringData:
         - Immich:
             description: Photos (iPhone backup)
             href: http://$ip:2283
-        - Vaultwarden:
-            description: Passwords (Phase 2)
-            href: http://$ip
     - Operations:
         - Grafana:
             description: Dashboards and alerts
