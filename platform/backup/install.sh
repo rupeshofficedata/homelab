@@ -46,6 +46,7 @@ REPO=$REPO
 PASSWORD_FILE=$PW_FILE
 KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 DATA_GLOB=$HOMELAB_ROOT/storage/*_immich_immich-library
+VW_GLOB=$HOMELAB_ROOT/storage/*_vaultwarden_vaultwarden-data
 MOUNT=$BACKUP_MOUNT
 STATE_DIR=/var/lib/homelab
 ENV

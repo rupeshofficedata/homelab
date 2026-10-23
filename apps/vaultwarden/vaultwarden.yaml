@@ -1,0 +1,56 @@
+# Vaultwarden: Bitwarden-compatible password manager. SQLite database on a PVC.
+# Private bits (DOMAIN contains the tailnet name) live in the SOPS secret
+# `vaultwarden-private`, created by install.sh.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: vaultwarden-data, namespace: vaultwarden}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources: {requests: {storage: 2Gi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: vaultwarden, namespace: vaultwarden}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}   # SQLite + RWO volume: never two pods at once
+  selector: {matchLabels: {app: vaultwarden}}
+  template:
+    metadata: {labels: {app: vaultwarden}}
+    spec:
+      enableServiceLinks: false
+      automountServiceAccountToken: false
+      securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
+      containers:
+        - name: vaultwarden
+          image: vaultwarden/server:1.37.4
+          ports: [{containerPort: 8080}]
+          env:
+            - {name: ROCKET_PORT, value: "8080"}
+            - {name: DOMAIN, valueFrom: {secretKeyRef: {name: vaultwarden-private, key: domain}}}
+            # Set to "false" (commit + push) once your own account exists.
+            - {name: SIGNUPS_ALLOWED, value: "true"}
+            # No ADMIN_TOKEN on purpose: the /admin panel stays disabled.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 256Mi}
+          volumeMounts: [{name: data, mountPath: /data}]
+          readinessProbe: {httpGet: {path: /alive, port: 8080}, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /alive, port: 8080}, periodSeconds: 20, failureThreshold: 3}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: vaultwarden-data}
+---
+# Entry point for `tailscale serve --bg --https=8222 http://127.0.0.1:30222`.
+apiVersion: v1
+kind: Service
+metadata: {name: vaultwarden-nodeport, namespace: vaultwarden}
+spec:
+  type: NodePort
+  selector: {app: vaultwarden}
+  ports:
+    - {port: 8080, targetPort: 8080, nodePort: 30222}

@@ -3,7 +3,7 @@
 # Installed to /usr/local/lib/homelab/ and run as root by homelab-backup.service.
 # Config comes from /etc/homelab/backup.env (rendered by install.sh).
 set -euo pipefail
-source /etc/homelab/backup.env   # REPO PASSWORD_FILE KUBECONFIG DATA_GLOB MOUNT STATE_DIR
+source /etc/homelab/backup.env   # REPO PASSWORD_FILE KUBECONFIG DATA_GLOB VW_GLOB MOUNT STATE_DIR
 export RESTIC_REPOSITORY=$REPO RESTIC_PASSWORD_FILE=$PASSWORD_FILE KUBECONFIG
 export RESTIC_CACHE_DIR=${CACHE_DIRECTORY:-/var/cache/restic}
 
@@ -23,6 +23,16 @@ kubectl -n immich exec immich-postgres-0 -- \
 lib=$(compgen -G "$DATA_GLOB" | head -1) || true
 [[ -n $lib ]] || { echo "library dir not found: $DATA_GLOB" >&2; exit 1; }
 restic backup "$lib" "$dump" --tag immich --host homelab
+
+# 3b. Vaultwarden. The SQLite file is live, so ask the app for a consistent copy
+#     (/data/db_*.sqlite3) first; restic then picks it up with the rest of /data.
+#     Skipped until the app exists.
+vw=$(compgen -G "$VW_GLOB" | head -1) || true
+if [[ -n $vw ]]; then
+  kubectl -n vaultwarden exec deploy/vaultwarden -- /vaultwarden backup
+  restic backup "$vw" --tag vaultwarden --host homelab
+  restic forget --host homelab --tag vaultwarden --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+fi
 
 # 4. Retention, then a weekly partial integrity check (5% of data, Sundays).
 restic forget --host homelab --tag immich --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune

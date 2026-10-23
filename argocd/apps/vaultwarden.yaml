@@ -1,0 +1,18 @@
+# Vaultwarden. prune is OFF: a mistaken commit must never delete the password database volume.
+# Secret `vaultwarden-private` is created by apps/vaultwarden/install.sh.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: vaultwarden
+  namespace: argocd
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: vaultwarden}
+  source:
+    repoURL: https://github.com/rupeshofficedata/homelab.git
+    targetRevision: main
+    path: apps/vaultwarden
+    directory: {include: "vaultwarden.yaml"}
+  syncPolicy:
+    automated: {prune: false, selfHeal: true}
+    syncOptions: [CreateNamespace=true]
