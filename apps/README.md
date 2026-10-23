@@ -10,7 +10,7 @@ apps/
   vaultwarden/   password manager (Phase 2)
   jellyfin/      media server, GPU transcoding (Phase 2)
   nextcloud/     files and sync (Phase 2)
-  homepage/      dashboard (Phase 2)
+  homepage/      dashboard (built, see homepage/README.md)
 ```
 
 ## Conventions
