@@ -28,7 +28,7 @@ server:
             DB_DATABASE_NAME: {valueFrom: {secretKeyRef: {name: immich-db, key: dbname}}}
           resources:
             requests: {cpu: 100m, memory: 512Mi}
-            limits: {memory: 2Gi}
+            limits: {memory: 4Gi}   # 2Gi OOM-killed on upload + transcode + face jobs at once
 
 machine-learning:
   controllers:
