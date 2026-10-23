@@ -5,6 +5,7 @@
 source "$(dirname "$0")/../bootstrap/scripts/lib.sh"
 need kubectl sops openssl
 
+# renovate: datasource=github-releases depName=argoproj/argo-cd
 ARGO_VERSION=v3.4.12   # pinned; verify it is still a supported release before applying
 HERE=$(cd "$(dirname "$0")" && pwd)
 SECRET_REL=secrets/grafana-admin.enc.yaml

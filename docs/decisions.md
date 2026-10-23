@@ -55,6 +55,8 @@ Shrinking exFAT in place is not supported by common Linux tools. Safe routes (Wi
 
 Renovate (a free GitHub app) opens PRs when a chart or image has a new version. You merge; Argo CD deploys. Add a small `helm lint` + gitleaks workflow only if broken syncs become a problem.
 
+Config: `renovate.json` (repo root). It watches the Argo chart versions, the Immich server tag and the Argo CD version. Immich and Postgres PRs get a `backup-first` label: run `sudo systemctl start homelab-backup` before merging. Nothing auto-merges.
+
 ### 8. Offsite later
 
 Until then there are two copies in one place. The iPhone itself and iCloud (keep it on) act as an informal third copy. See [backup-restore.md](backup-restore.md#known-weaknesses).
