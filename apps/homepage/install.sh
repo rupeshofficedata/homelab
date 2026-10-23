@@ -37,8 +37,8 @@ stringData:
             description: Metrics and queries
             href: http://$ip:9090
         - Argo CD:
-            description: "No web UI in core mode. On the PC run: argocd admin dashboard -n argocd"
-            href: http://localhost:8080
+            description: "No web UI in core mode. On the PC run: argocd admin dashboard -n argocd --port 8099"
+            href: http://localhost:8099
 YAML
     mv "$SECRET_REL.tmp" "$SECRET_REL"
   fi
