@@ -1,0 +1,17 @@
+# Homepage dashboard. Secret `homepage-private` is created by apps/homepage/install.sh.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homepage
+  namespace: argocd
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: homepage}
+  source:
+    repoURL: https://github.com/rupeshofficedata/homelab.git
+    targetRevision: main
+    path: apps/homepage
+    directory: {include: "homepage.yaml"}
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

@@ -21,7 +21,7 @@ spec:
     - repoURL: https://github.com/rupeshofficedata/homelab.git
       targetRevision: main
       path: platform/monitoring
-      directory: {include: "{rules,grafana-nodeport}.yaml"}
+      directory: {include: "{rules,grafana-nodeport,prometheus-nodeport}.yaml"}
   syncPolicy:
     automated: {prune: true, selfHeal: true}
     syncOptions: [CreateNamespace=true, ServerSideApply=true]

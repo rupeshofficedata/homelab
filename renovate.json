@@ -1,14 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "dependencyDashboard": true,
   "automerge": false,
-  "argocd": { "managerFilePatterns": ["/^argocd/apps/.+\\.yaml$/"] },
+  "argocd": {
+    "managerFilePatterns": [
+      "/^argocd/apps/.+\\.yaml$/"
+    ]
+  },
   "customManagers": [
     {
       "description": "Versions marked with a `# renovate: datasource=... depName=...` comment",
       "customType": "regex",
-      "managerFilePatterns": ["/^apps/immich/values\\.yaml$/", "/^argocd/install\\.sh$/"],
+      "managerFilePatterns": [
+        "/^apps/immich/values\\.yaml$/",
+        "/^argocd/install\\.sh$/"
+      ],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)\\s*\\n\\s*\\S+(?::|=)\\s*(?<currentValue>\\S+)"
       ]
@@ -17,14 +26,30 @@
   "packageRules": [
     {
       "description": "Immich server and its chart move together: one PR, labelled for a backup first",
-      "matchPackageNames": ["ghcr.io/immich-app/immich-server", "immich", "ghcr.io/immich-app/immich-charts/immich"],
+      "matchPackageNames": [
+        "ghcr.io/immich-app/immich-server",
+        "immich",
+        "ghcr.io/immich-app/immich-charts/immich"
+      ],
       "groupName": "immich",
-      "addLabels": ["backup-first"]
+      "addLabels": [
+        "backup-first"
+      ]
     },
     {
       "description": "Postgres image carries the vector extensions; major jumps need a manual dump/restore",
-      "matchPackageNames": ["ghcr.io/immich-app/postgres"],
-      "addLabels": ["backup-first", "database"]
+      "matchPackageNames": [
+        "ghcr.io/immich-app/postgres"
+      ],
+      "addLabels": [
+        "backup-first",
+        "database"
+      ]
     }
-  ]
+  ],
+  "kubernetes": {
+    "managerFilePatterns": [
+      "/^apps/.+\\.yaml$/"
+    ]
+  }
 }
