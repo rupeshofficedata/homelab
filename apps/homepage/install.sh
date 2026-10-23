@@ -3,7 +3,7 @@
 # Tailscale address), encrypt it with SOPS, and apply it. Dry run unless APPLY=1.
 # The Deployment itself is deployed by Argo CD (argocd/apps/homepage.yaml).
 source "$(dirname "$0")/../../bootstrap/scripts/lib.sh"
-need kubectl sops tailscale
+need kubectl sops tailscale python3
 
 SECRET_REL=secrets/homepage.enc.yaml
 export KUBECONFIG=${KUBECONFIG:-$KUBECONFIG_OUT}
@@ -18,6 +18,7 @@ if [[ ! -f $SECRET_REL ]]; then
   log "creating $SECRET_REL"
   if [[ $APPLY == 1 ]]; then
     ip=$(tailscale ip -4 | head -n1)
+    fq=$(tailscale status --json | python3 -c "import json,sys;print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))")
     sops -e --filename-override "$SECRET_REL" --input-type yaml --output-type yaml /dev/stdin > "$SECRET_REL.tmp" <<YAML
 apiVersion: v1
 kind: Secret
@@ -29,6 +30,9 @@ stringData:
         - Immich:
             description: Photos (iPhone backup)
             href: http://$ip:2283
+        - Vaultwarden:
+            description: Passwords
+            href: https://$fq:8222
     - Operations:
         - Grafana:
             description: Dashboards and alerts
