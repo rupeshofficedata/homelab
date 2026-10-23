@@ -7,7 +7,7 @@ controllers:
       main:
         image:
           # renovate: datasource=docker depName=ghcr.io/immich-app/immich-server
-          tag: v3.2.0   # Immich version; chart does not auto-update. Bump deliberately.
+          tag: v3.3.5   # Immich version; chart does not auto-update. Bump deliberately.
 
 immich:
   persistence:
