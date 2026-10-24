@@ -1,6 +1,6 @@
 # platform/backup
 
-Nightly encrypted backup of Immich to the external drive with restic. **Built; first run and mechanical restore drill passed.**
+Nightly encrypted backup of Immich, Vaultwarden and Nextcloud to the external drive with restic. **Built; first run and mechanical restore drill passed for all three apps.**
 
 > [!NOTE]
 > This is a host **systemd timer**, not a Kubernetes CronJob. restic and `kubectl` run on the host, which avoids mount-propagation problems with the autofs-mounted drive.
