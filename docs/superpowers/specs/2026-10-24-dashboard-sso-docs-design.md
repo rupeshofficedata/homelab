@@ -74,3 +74,16 @@ Existing: `docs/` (architecture, decisions, getting-started, secrets, backup-res
 - Identity service down means nobody can log in to SSO apps. Mitigation: every app keeps a local admin account as break-glass.
 - Jellyfin SSO is a third-party plugin and may lag Jellyfin releases.
 - OIDC needs HTTPS URLs; mixing HTTP tailnet links may need Tailscale HTTPS for the identity service.
+
+## Builder-check outcomes (my calls, added after review)
+
+- **URLs:** Pocket ID and the dashboard each get their own Tailscale HTTPS port on the same node name (like Vaultwarden 8222 and Nextcloud 8443). The issuer URL is fixed before any app is wired, because passkeys bind to it. Pods reach it through an in-cluster alias (CoreDNS entry or `hostAliases` to the node's Tailscale IP); the build must test this first.
+- **Cutover:** the new dashboard runs beside Homepage on a new port. Homepage is removed only after the new one is verified.
+- **Visibility:** per group, not per user. Two groups to start: `admin` and `family`. The app-to-group map lives in a ConfigMap that holds group and app names only (no user names).
+- **Pocket ID API keys are all-admin, not scoped.** The dashboard therefore holds a full-admin key. Accepted because the dashboard is tailnet-only, admin routes are checked server-side, and the key is a SOPS secret that can be rotated. A narrower design (users page links to Pocket ID's own admin screen) is the fallback if this is not acceptable.
+- **Onboarding without email:** the admin issues a one-time login link (Pocket ID supports it) and the user registers a passkey.
+- **Accounts:** auto-register on first SSO login for the `family` group; existing admin accounts in Immich, Nextcloud and Jellyfin are linked by email. Every app keeps a local admin as break-glass.
+- **OIDC clients:** created by the install script through the Pocket ID API when possible, otherwise listed as manual steps in the guide.
+- **Help checks:** disk and backup age come from Prometheus queries (already running). Pod logs need extra read access and are limited to a named list of app namespaces, with output trimmed.
+- **Docs:** Mermaid diagrams in Markdown. The dashboard links to the public GitHub repo pages. Pocket ID's SQLite volume is added to the restic backup and the restore doc.
+- **Image build:** Docker is present on this PC. New PC needs Docker or Podman, listed as a prerequisite.
