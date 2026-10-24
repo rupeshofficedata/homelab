@@ -1,4 +1,5 @@
 # VERSION: 2.1
+# LOCAL PATCHES: magnet-only resolution; scrape fallback restricted to snowfl.com.
 # qBittorrent search engine plugin for snowfl.com
 #
 # AUTO-GENERATED — DO NOT EDIT engine/snowfl.py BY HAND.
@@ -104,7 +105,8 @@ def fill_magnets(api_key, data, fetch):
         if not item.get("magnet"):
             try:
                 resolved = json.loads(fetch(build_magnet_url(api_key, item)))
-                item["magnet"] = resolved.get("url", "")
+                url = resolved.get("url", "")
+                item["magnet"] = url if url.startswith("magnet:") else ""   # local patch: magnets only
             except Exception:
                 pass
         results.append(item)
@@ -207,6 +209,12 @@ class snowfl(object):
         if info.startswith("magnet:"):
             print(info + " " + info)
             return
+        # local patch: the scrape fallback may only fetch snowfl.com over http(s), never an arbitrary
+        # (possibly internal) URL taken from search results.
+        from urllib.parse import urlparse
+        u = urlparse(info)
+        if u.scheme not in ("http", "https") or not (u.hostname or "").endswith("snowfl.com"):
+            raise RuntimeError("Refusing non-Snowfl link: " + info)
         page = retrieve_url(info)
         match = re.search(r'"(magnet:[^"]+)"', page)
         if match:
