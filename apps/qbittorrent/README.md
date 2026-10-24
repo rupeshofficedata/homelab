@@ -4,7 +4,7 @@ Torrent client with a web UI, tailnet-only.
 
 | File | What it does |
 |---|---|
-| `qbittorrent.yaml` | 1Gi config PVC, Deployment (`qbittorrent-nox`, non-root), NodePort 30081 |
+| `qbittorrent.yaml` | 1Gi config PVC, Deployment (`qbittorrent-nox`, non-root), NodePort 30081 (app also listens on 8081: qBittorrent rejects a Host port that differs from its own) |
 
 - **Downloads:** `/srv/homelab/media/downloads` (host folder). Jellyfin mounts the parent read-only, so finished files appear in its library.
 - **Access:** `http://<tailscale-ip>:8081` via `tailscale serve --bg --tcp 8081 tcp://127.0.0.1:30081`.
