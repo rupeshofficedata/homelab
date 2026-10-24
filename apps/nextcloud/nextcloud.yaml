@@ -70,7 +70,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: nextcloud
-          image: nextcloud:34.0.5-apache
+          image: nextcloud:35.0.2-apache
           ports: [{containerPort: 80}]
           env:
             - {name: POSTGRES_HOST, value: nextcloud-postgres}
@@ -103,7 +103,7 @@ spec:
             - {name: files, mountPath: /data}
         # Background jobs (file scans, cleanup). Same image, same volumes.
         - name: cron
-          image: nextcloud:34.0.5-apache
+          image: nextcloud:35.0.2-apache
           command: [/cron.sh]
           securityContext:
             allowPrivilegeEscalation: false
