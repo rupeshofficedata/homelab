@@ -11,3 +11,4 @@ kubeconfig*
 .cache/
 .remember/
 *.log
+.superpowers/
