@@ -6,6 +6,7 @@
 # To add or update one: read it, then regenerate plugins/SHA256SUMS with `sha256sum`.
 set -euo pipefail
 cd "$(dirname "$0")"
+[[ -f $HOME/.kube/homelab ]] && export KUBECONFIG=$HOME/.kube/homelab   # not the kind-cluster default
 DEST=/config/qBittorrent/data/nova3/engines
 tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
