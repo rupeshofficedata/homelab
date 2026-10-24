@@ -30,6 +30,9 @@ stringData:
         - Immich:
             description: Photos (iPhone backup)
             href: http://$ip:2283
+        - Jellyfin:
+            description: Movies and shows
+            href: http://$ip:8096
         - Vaultwarden:
             description: Passwords
             href: https://$fq:8222

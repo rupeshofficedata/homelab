@@ -10,7 +10,7 @@ need findmnt chattr lsblk
 # 1. Data dirs. +C = no copy-on-write (better for Postgres, fewer fragments).
 #    New files inherit +C, so set it while the dir is still empty.
 # ponytail: +C covers photos too (loses btrfs checksums for them); split Postgres out if you want bit-rot detection.
-run sudo mkdir -p "$HOMELAB_ROOT"/{k3s,storage}
+run sudo mkdir -p "$HOMELAB_ROOT"/{k3s,storage,media}   # media: Jellyfin library, mount the big drive here
 run sudo chattr +C "$HOMELAB_ROOT/storage"
 
 # 2. Backup mountpoint. +i on the EMPTY directory makes writes fail while the

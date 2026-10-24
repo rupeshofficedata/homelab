@@ -1,0 +1,17 @@
+# Jellyfin. prune is OFF: a mistaken commit must never delete the config volume.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: jellyfin
+  namespace: argocd
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: jellyfin}
+  source:
+    repoURL: https://github.com/rupeshofficedata/homelab.git
+    targetRevision: main
+    path: apps/jellyfin
+    directory: {include: "jellyfin.yaml"}
+  syncPolicy:
+    automated: {prune: false, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

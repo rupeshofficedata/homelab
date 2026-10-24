@@ -8,7 +8,7 @@ One folder per self-hosted application. **`immich/` is built (Phase 1a); the res
 apps/
   immich/        manifests + Helm values (built, see immich/README.md)
   vaultwarden/   password manager (built, see vaultwarden/README.md)
-  jellyfin/      media server, GPU transcoding (Phase 2)
+  jellyfin/      media server (built, see jellyfin/README.md)
   nextcloud/     files and sync (Phase 2)
   homepage/      dashboard (built, see homepage/README.md)
 ```
