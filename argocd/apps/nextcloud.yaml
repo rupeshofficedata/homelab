@@ -1,0 +1,18 @@
+# Nextcloud. prune is OFF: a mistaken commit must never delete the database or app volumes.
+# Secret `nextcloud-private` is created by apps/nextcloud/install.sh.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nextcloud
+  namespace: argocd
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: nextcloud}
+  source:
+    repoURL: https://github.com/rupeshofficedata/homelab.git
+    targetRevision: main
+    path: apps/nextcloud
+    directory: {include: "nextcloud.yaml"}
+  syncPolicy:
+    automated: {prune: false, selfHeal: true}
+    syncOptions: [CreateNamespace=true]

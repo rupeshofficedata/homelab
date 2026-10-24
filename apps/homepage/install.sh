@@ -33,6 +33,9 @@ stringData:
         - Jellyfin:
             description: Movies and shows
             href: http://$ip:8096
+        - Nextcloud:
+            description: Files and sync
+            href: https://$fq:8443
         - Vaultwarden:
             description: Passwords
             href: https://$fq:8222

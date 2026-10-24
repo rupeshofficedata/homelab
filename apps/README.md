@@ -9,7 +9,7 @@ apps/
   immich/        manifests + Helm values (built, see immich/README.md)
   vaultwarden/   password manager (built, see vaultwarden/README.md)
   jellyfin/      media server (built, see jellyfin/README.md)
-  nextcloud/     files and sync (Phase 2)
+  nextcloud/     files and sync (built, see nextcloud/README.md)
   homepage/      dashboard (built, see homepage/README.md)
 ```
 

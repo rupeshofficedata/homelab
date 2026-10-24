@@ -3,7 +3,7 @@
 # Installed to /usr/local/lib/homelab/ and run as root by homelab-backup.service.
 # Config comes from /etc/homelab/backup.env (rendered by install.sh).
 set -euo pipefail
-source /etc/homelab/backup.env   # REPO PASSWORD_FILE KUBECONFIG DATA_GLOB VW_GLOB MOUNT STATE_DIR
+source /etc/homelab/backup.env   # REPO PASSWORD_FILE KUBECONFIG DATA_GLOB VW_GLOB NC_GLOB NC_DATA MOUNT STATE_DIR
 export RESTIC_REPOSITORY=$REPO RESTIC_PASSWORD_FILE=$PASSWORD_FILE KUBECONFIG
 export RESTIC_CACHE_DIR=${CACHE_DIRECTORY:-/var/cache/restic}
 
@@ -32,6 +32,21 @@ if [[ -n $vw ]]; then
   kubectl -n vaultwarden exec deploy/vaultwarden -- /vaultwarden backup
   restic backup "$vw" --tag vaultwarden --host homelab
   restic forget --host homelab --tag vaultwarden --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
+fi
+
+# 3c. Nextcloud. Maintenance mode freezes writes so the DB dump and the files agree;
+#     the trap switches it back on-line even if a step fails. Skipped until the app exists.
+nc=$(compgen -G "$NC_GLOB" | head -1) || true
+if [[ -n $nc ]]; then
+  occ() { kubectl -n nextcloud exec deploy/nextcloud -c nextcloud -- su -s /bin/sh www-data -c "php occ $*"; }
+  trap 'occ maintenance:mode --off >/dev/null 2>&1 || true; rm -rf "$dump"' EXIT
+  occ maintenance:mode --on
+  kubectl -n nextcloud exec nextcloud-postgres-0 -- \
+    sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$dump/nextcloud.pgdump"
+  [[ -s $dump/nextcloud.pgdump ]] || { echo "empty Nextcloud DB dump" >&2; exit 1; }
+  restic backup "$nc" "$NC_DATA" "$dump/nextcloud.pgdump" --tag nextcloud --host homelab
+  occ maintenance:mode --off
+  restic forget --host homelab --tag nextcloud --keep-daily 7 --keep-weekly 4 --keep-monthly 12 --prune
 fi
 
 # 4. Retention, then a weekly partial integrity check (5% of data, Sundays).
