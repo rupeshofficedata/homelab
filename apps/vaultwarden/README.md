@@ -11,7 +11,7 @@ Publish: `sudo tailscale serve --bg --https=8222 http://127.0.0.1:30222`.
 
 ## First account, then close signups
 
-`SIGNUPS_ALLOWED` is `"true"` only so the first account can be created. Anyone on the tailnet could register while it is open, so close it right away:
+`SIGNUPS_ALLOWED` is now `"false"` (closed). It was `"true"` only so the first account can be created. Anyone on the tailnet could register while it is open, so close it right away:
 
 1. Open the URL, create your account.
 2. Set `SIGNUPS_ALLOWED` to `"false"` in `vaultwarden.yaml`, commit, push. Argo applies it.

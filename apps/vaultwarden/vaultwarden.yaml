@@ -29,8 +29,8 @@ spec:
           env:
             - {name: ROCKET_PORT, value: "8080"}
             - {name: DOMAIN, valueFrom: {secretKeyRef: {name: vaultwarden-private, key: domain}}}
-            # Set to "false" (commit + push) once your own account exists.
-            - {name: SIGNUPS_ALLOWED, value: "true"}
+            # Closed after the first account was created. Set "true", push, create the account, set back.
+            - {name: SIGNUPS_ALLOWED, value: "false"}
             # No ADMIN_TOKEN on purpose: the /admin panel stays disabled.
           securityContext:
             allowPrivilegeEscalation: false
