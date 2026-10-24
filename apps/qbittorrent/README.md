@@ -11,3 +11,7 @@ Torrent client with a web UI, tailnet-only.
 - **Login:** user `admin`; on first start qBittorrent prints a one-time password in the pod log (`kubectl -n qbittorrent logs deploy/qbittorrent`). Set a permanent one in Tools > Options > WebUI.
 - **Limits:** no inbound peer port is opened (fewer peers, still works). Traffic leaves via your home IP; add a VPN sidecar if that matters. Config is not in the restic backup (settings only; downloads are re-fetchable).
 - `prune: false` in the Argo app so a bad commit cannot delete the config volume.
+
+## Search plugins
+
+`plugins/` holds vetted search-engine plugins; `install-plugins.sh` copies them into the pod (`APPLY=1`). See [plugins/README.md](plugins/README.md). Plugins live on the config PVC, so they survive restarts; re-run the script only after a wiped volume.
