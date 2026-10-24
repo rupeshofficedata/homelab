@@ -9,5 +9,5 @@ Each was read before being added: they only call the search site's API through q
 | `animetosho.py` | [Phlexis96/qBitTorrent-animetosho-search-plugin](https://github.com/Phlexis96/qBitTorrent-animetosho-search-plugin) | Anime | JSON feed. |
 | `yts.py` | [lazulyra/qbit-plugins](https://codeberg.org/lazulyra/qbit-plugins) | Movies | YTS API. |
 
-`SHA256SUMS` pins the exact files; the install script refuses anything that does not match.
+`SHA256SUMS` pins the exact files and is the only list the install script uses. `eztvx.py` carries three small local patches (OMDb over https, URL-encoded title, strict `imdbID` check), noted at its top.
 Source list: <https://github.com/qbittorrent/search-plugins/wiki/Unofficial-search-plugins>. Not added: Prowlarr plugin (needs a Prowlarr service), Nyaa (last updated 2019).

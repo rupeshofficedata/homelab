@@ -1,18 +1,23 @@
 #!/usr/bin/env bash
 # install-plugins.sh - copy the vetted search plugins in plugins/ into the running qBittorrent pod.
 # Re-run after a fresh install or a wiped config volume. Dry run unless APPLY=1.
-# Plugins are Python code that runs inside the pod, so only files whose sha256 matches
-# plugins/SHA256SUMS are installed. To add or update one: read it, then re-run `sha256sum` into that file.
+# Plugins are Python code that runs inside the pod, so ONLY files listed in plugins/SHA256SUMS
+# are installed, and each is hashed and sent from the same private copy (no swap between check and use).
+# To add or update one: read it, then regenerate plugins/SHA256SUMS with `sha256sum`.
 set -euo pipefail
 cd "$(dirname "$0")"
 DEST=/config/qBittorrent/data/nova3/engines
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
 
-(cd plugins && sha256sum -c SHA256SUMS)   # abort on any mismatch
-for f in plugins/*.py; do
+while read -r sum name; do
+  name=${name#\*}
+  [[ $name =~ ^[A-Za-z0-9_]+\.py$ ]] || { echo "bad name in SHA256SUMS: $name" >&2; exit 1; }
+  cp "plugins/$name" "$tmp/$name"
+  echo "$sum  $tmp/$name" | sha256sum -c --quiet - || { echo "checksum mismatch: $name" >&2; exit 1; }
   if [[ ${APPLY:-0} == 1 ]]; then
-    kubectl -n qbittorrent exec -i deploy/qbittorrent -- sh -c "cat > $DEST/$(basename "$f")" < "$f"
-    echo "installed $(basename "$f")"
+    kubectl -n qbittorrent exec -i deploy/qbittorrent -- sh -c "cat > $DEST/$name" < "$tmp/$name"
+    echo "installed $name"
   else
-    echo "would install $(basename "$f") (APPLY=1 to do it)"
+    echo "would install $name (APPLY=1 to do it)"
   fi
-done
+done < plugins/SHA256SUMS

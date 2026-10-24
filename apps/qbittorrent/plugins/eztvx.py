@@ -1,8 +1,10 @@
 #VERSION: 3.20
 #AUTHORS: DrPurp (Updated)
+# LOCAL PATCHES: OMDb over https, quote_plus on the title, imdbID must match tt<digits>.
 
 import json
 import re
+from urllib.parse import quote_plus
 from helpers import download_file, retrieve_url
 from novaprinter import prettyPrinter
 
@@ -126,15 +128,17 @@ class eztvx(object):
             return None
         try:
             omdb_url = (
-                'http://www.omdbapi.com/?apikey={}&t={}&type=series'.format(
+                'https://www.omdbapi.com/?apikey={}&t={}&type=series'.format(
                     self.OMDB_API_KEY,
-                    title.replace(' ', '+')
+                    quote_plus(title)
                 )
             )
             response = retrieve_url(omdb_url)
             data = json.loads(response)
             if data.get('Response') == 'True':
-                return data.get('imdbID', '').replace('tt', '')
+                imdb = data.get('imdbID', '')
+                if re.fullmatch(r'tt\d+', imdb):   # local patch: never put API-supplied text into a URL
+                    return imdb[2:]
         except Exception:
             pass
         return None
