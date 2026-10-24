@@ -33,6 +33,9 @@ stringData:
         - Jellyfin:
             description: Movies and shows
             href: http://$ip:8096
+        - qBittorrent:
+            description: Torrent downloads
+            href: http://$ip:8081
         - Nextcloud:
             description: Files and sync
             href: https://$fq:8443
