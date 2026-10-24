@@ -213,7 +213,8 @@ class snowfl(object):
         # (possibly internal) URL taken from search results.
         from urllib.parse import urlparse
         u = urlparse(info)
-        if u.scheme not in ("http", "https") or not (u.hostname or "").endswith("snowfl.com"):
+        h = (u.hostname or "").lower()
+        if u.scheme not in ("http", "https") or not (h == "snowfl.com" or h.endswith(".snowfl.com")):
             raise RuntimeError("Refusing non-Snowfl link: " + info)
         page = retrieve_url(info)
         match = re.search(r'"(magnet:[^"]+)"', page)
