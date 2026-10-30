@@ -1,10 +1,11 @@
 [Unit]
-Description=Run the Immich backup nightly
+Description=Run the HomeLab backup every night
 
 [Timer]
 OnCalendar=*-*-* 02:30:00
-# Run at next boot if the PC was off at 02:30.
+# If the computer was off at 02:30, run the backup at the next start.
 Persistent=true
+# Wait a random 0 to 10 minutes, so the start time is not exactly the same each night.
 RandomizedDelaySec=10m
 
 [Install]

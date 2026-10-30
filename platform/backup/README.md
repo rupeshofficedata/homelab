@@ -1,50 +1,56 @@
-# platform/backup
+# platform/backup/
 
-Nightly encrypted backup of Immich, Vaultwarden and Nextcloud to the external drive with restic. **Built; first run and mechanical restore drill passed for all three apps.**
+The nightly encrypted backup of Immich, Vaultwarden and Nextcloud to the external drive, using restic.
 
 > [!NOTE]
-> This is a host **systemd timer**, not a Kubernetes CronJob. restic and `kubectl` run on the host, which avoids mount-propagation problems with the autofs-mounted drive.
+> This is a **systemd timer** on the host, not a Kubernetes CronJob. `restic` and `kubectl` run on the host, which avoids mount problems with the automount drive. The reason is in [decisions.md](../../docs/decisions.md#10-backup-runs-from-a-systemd-timer-not-a-cronjob).
 
 ## Files
 
 | File | What it does |
 |---|---|
-| `backup.sh` | The job. Installed to `/usr/local/lib/homelab/` and run as root. |
-| `homelab-backup.service` | One-shot unit that runs `backup.sh` with low CPU/IO priority. |
-| `homelab-backup.timer` | Fires daily at 02:30 (+ up to 10 min random). `Persistent=true` catches up after downtime. |
-| `install.sh` | Creates the repo password, initialises the repo, installs the config and units, enables the timer. |
+| `backup.sh` | The backup. `install.sh` copies it to `/usr/local/lib/homelab/`. systemd runs it as root. |
+| `homelab-backup.service` | Runs `backup.sh` once, at low CPU and disk priority |
+| `homelab-backup.timer` | Starts the service every night at 02:30 (plus up to 10 random minutes). `Persistent=true` runs it at the next start if the computer was off. |
+| `install.sh` | Creates the backup password, creates the restic repository, installs the settings and the units, turns the timer on |
 
 ## What `backup.sh` does
 
 ```mermaid
 flowchart TD
-  a["ls /mnt/backup<br/>(triggers automount)"] --> b{"repo config<br/>file exists?"}
-  b -- no --> x["exit 1: drive missing"]
-  b -- yes --> c["pg_dump via kubectl exec"] --> d["restic backup<br/>library + dump"] --> e["forget + prune<br/>7d / 4w / 6m"] --> f{"Sunday?"}
-  f -- yes --> g["restic check 5%"] --> h["write success stamp"]
-  f -- no --> h
+  a["ls /mnt/backup<br/>(starts the automount)"] --> b{"repository<br/>'config' file there?"}
+  b -- no --> x["stop: drive missing"]
+  b -- yes --> c["Immich: dump + library"] --> d["Vaultwarden: safe copy + data"] --> e["Nextcloud: maintenance on, dump + files, maintenance off"]
+  e --> f["Remove old snapshots<br/>(after each app)"] --> g{"Sunday?"}
+  g -- yes --> h["restic check (5% of the data)"] --> i["write the success time"]
+  g -- no --> i
 ```
 
-## Code blocks worth knowing
+Vaultwarden and Nextcloud are skipped if they are not installed.
 
-- **Drive guard:** the empty mountpoint on the SSD is immutable and has no restic `config` file, so a missing drive fails the job instead of filling the SSD.
-- **`pg_dump` instead of copying Postgres files:** a dump is consistent while the database runs. The library files are copied live, so a photo uploaded mid-backup may be in one and not the other.
-- **`--host homelab`:** keeps retention grouping stable even if the machine is renamed.
-- **Success stamp** `/var/lib/homelab/last-backup-success`: Phase 1b alerts when it is older than 26 hours.
+## Ideas worth knowing
 
-## Operate
+- **The drive guard.** The empty mount point on the main disk is read-only and has no restic `config` file. A missing drive stops the job instead of filling the main disk.
+- **`pg_dump` instead of copying database files.** A dump is consistent while the database runs. The library files are copied live, so a photo uploaded during the backup may be in one and not in the other.
+- **`--host homelab`.** A fixed name keeps the "keep the last N snapshots" rules stable, even if the computer is renamed.
+- **The success time.** `/var/lib/homelab/last-backup-success` and `homelab_backup.prom`. Prometheus reads the `.prom` file, and the `BackupStale` alert fires when it is older than 26 hours.
+- **A cleanup that always runs.** `backup.sh` has a `trap cleanup EXIT`. Even after an error it turns Nextcloud maintenance mode off and deletes the temporary dumps.
+
+## Use it
 
 ```bash
-APPLY=1 ./platform/backup/install.sh          # install / reinstall
-sudo systemctl start homelab-backup.service   # run now
-journalctl -u homelab-backup.service -e       # logs
-systemctl list-timers homelab-backup.timer    # next run
+APPLY=1 ./platform/backup/install.sh          # install or update
+sudo systemctl start homelab-backup.service   # run a backup now
+journalctl -u homelab-backup.service -e       # read the log
+systemctl list-timers homelab-backup.timer    # when is the next run?
 sudo restic -r /mnt/backup/homelab-restic --password-file /etc/homelab/restic-password snapshots
 ```
 
-Restore walkthrough: [../../docs/backup-restore.md](../../docs/backup-restore.md).
+After you change `backup.sh`, run `install.sh` again. systemd runs the installed copy.
+
+How to restore: [docs/backup-restore.md](../../docs/backup-restore.md).
 
 ## Known limits
 
-- Two copies, one location: the live library and the drive. An offsite copy is Phase 2.
-- The restic password is readable by root in `/etc/homelab/restic-password` so the timer can run unattended.
+- Two copies in one place: the live data and the drive. An offsite copy is on the [roadmap](../../docs/roadmap.md).
+- The restic password is saved in `/etc/homelab/restic-password`, readable by root, so the timer can run with nobody logged in.

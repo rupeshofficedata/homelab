@@ -1,26 +1,41 @@
 #!/usr/bin/env bash
-# pre-commit: stop secrets from reaching the PUBLIC repo.
-# Enabled by `git config core.hooksPath .githooks` (already set by `git init` step).
-# Checks, in order: (1) staged secrets/*.yaml are SOPS-encrypted,
-# (2) gitleaks finds no plaintext secrets, (3) staged shell scripts parse.
+# pre-commit - runs before every commit and stops secrets from reaching this PUBLIC repo.
+# Turn it on once per clone:  git config core.hooksPath .githooks
+#
+# It checks three things:
+#   1. Every changed file in secrets/ is encrypted with SOPS.
+#   2. gitleaks finds no plain-text secrets.
+#   3. Every changed shell script has valid syntax.
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
 
-staged() { git diff --cached --name-only --diff-filter=ACM -- "$@"; }
-fail=0
+# staged_files PATTERN...  List the files that are part of this commit.
+staged_files() { git diff --cached --name-only --diff-filter=ACM -- "$@"; }
+failed=0
 
-# 1. Encrypted-only: a SOPS file always has a top-level `sops:` key.
-#    Read the STAGED blob (git show :path), not the working tree.
-while IFS= read -r f; do
-  git show ":$f" | grep -q '^sops:' || { echo "NOT ENCRYPTED: $f (run: sops -e -i $f)" >&2; fail=1; }
-done < <(staged 'secrets/*.yaml' 'secrets/*.yml')
+# 1. An encrypted SOPS file always has a top-level "sops:" key.
+#    We read the staged version of the file (git show :path), not the one on disk.
+while IFS= read -r file; do
+  if ! git show ":$file" | grep -q '^sops:'; then
+    echo "NOT ENCRYPTED: $file   (fix: sops -e -i $file)" >&2
+    failed=1
+  fi
+done < <(staged_files 'secrets/*.yaml' 'secrets/*.yml')
 
-# 2. Generic secret scan. Required: the repo is public, so no scanner = no commit.
-command -v gitleaks >/dev/null || { echo "gitleaks missing: sudo pacman -S gitleaks" >&2; exit 1; }
-if gitleaks git --help >/dev/null 2>&1; then gitleaks git --staged --redact || fail=1
-else gitleaks protect --staged --redact || fail=1; fi   # older gitleaks
+# 2. Scan for secrets. The repo is public, so no scanner means no commit.
+if ! command -v gitleaks >/dev/null; then
+  echo "gitleaks is not installed. Install it with your package manager." >&2
+  exit 1
+fi
+if gitleaks git --help >/dev/null 2>&1; then
+  gitleaks git --staged --redact || failed=1
+else
+  gitleaks protect --staged --redact || failed=1   # older gitleaks versions
+fi
 
-# 3. Syntax check staged shell scripts.
-while IFS= read -r f; do bash -n "$f" || fail=1; done < <(staged '*.sh' '.githooks/*')
+# 3. Check the syntax of shell scripts.
+while IFS= read -r file; do
+  bash -n "$file" || failed=1
+done < <(staged_files '*.sh' '.githooks/*')
 
-exit "$fail"
+exit "$failed"

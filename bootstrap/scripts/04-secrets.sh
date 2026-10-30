@@ -1,20 +1,22 @@
 #!/usr/bin/env bash
-# 04-secrets.sh - create the age key and put its PUBLIC half in .sops.yaml.
-# The private key stays in $AGE_KEY_FILE and must never enter git.
+# 04-secrets.sh - create the age key that locks and unlocks the secrets.
+# The PUBLIC half (it only locks) goes into .sops.yaml and into git.
+# The PRIVATE half stays in $AGE_KEY_FILE. It must never go into git.
 source "$(dirname "$0")/lib.sh"
 need age-keygen sops
 
 if [[ -f $AGE_KEY_FILE ]]; then
-  log "age key exists: $AGE_KEY_FILE (not overwritten)"
+  log "age key already exists: $AGE_KEY_FILE (not replaced)"
 else
   run mkdir -p "$(dirname "$AGE_KEY_FILE")"
-  run age-keygen -o "$AGE_KEY_FILE"   # creates the file with mode 600
+  run age-keygen -o "$AGE_KEY_FILE"   # also creates the file with owner-only permissions
 fi
 
+# Copy the public key into .sops.yaml.
 if [[ -f $AGE_KEY_FILE ]]; then
-  pub=$(age-keygen -y "$AGE_KEY_FILE")
-  run sed -i "s|^\(\s*age: \).*|\1$pub|" "$REPO_DIR/.sops.yaml"
+  public_key=$(age-keygen -y "$AGE_KEY_FILE")
+  run sed -i "s|^\(\s*age: \).*|\1$public_key|" "$REPO_DIR/.sops.yaml"
 fi
 
-warn "BACK UP $AGE_KEY_FILE now: cloud password manager + a copy on the drive."
-warn "Lose it and every encrypted secret is unrecoverable. See docs/secrets.md."
+warn "Back up $AGE_KEY_FILE now: a password manager, plus a copy on the backup drive."
+warn "If you lose it, every encrypted secret is lost. See docs/secrets.md."

@@ -1,35 +1,38 @@
 # argocd/
 
-GitOps entry point (Phase 1b). Applied after the photo upload finished.
+The GitOps part. Argo CD watches this repo on GitHub and makes the cluster match it.
 
-Argo CD watches this repository on GitHub and makes the cluster match it. One root `Application` creates one `Application` per file in `apps/`.
+One **root application** creates one Argo CD application for every file in `argocd/apps/`.
 
 ```mermaid
 flowchart LR
-  git["GitHub main"] --> root["root Application<br/>argocd/root-app.yaml"]
-  root --> imm["apps/immich.yaml"] & mon["apps/monitoring.yaml"]
-  imm --> c1["Immich chart (OCI)<br/>+ apps/immich/*.yaml"]
-  mon --> c2["kube-prometheus-stack<br/>+ platform/monitoring/*.yaml"]
+  git["GitHub, branch main"] --> root["root application<br/>argocd/root-app.yaml"]
+  root --> a1["apps/immich.yaml"] & a2["apps/monitoring.yaml"] & a3["apps/nextcloud.yaml ..."]
+  a1 --> c1["Immich chart<br/>+ apps/immich/*.yaml"]
+  a2 --> c2["kube-prometheus-stack<br/>+ platform/monitoring/*.yaml"]
 ```
+
+To add an app: add a file to `argocd/apps/` and merge it to `main`.
 
 ## Files
 
 | File | What it does |
 |---|---|
-| `install.sh` | Installs Argo CD core, creates the Grafana secret (SOPS), applies `repos.yaml` and the root app. Dry run unless `APPLY=1`. Refuses if git has unpushed changes. |
-| `repos.yaml` | Registers the GHCR OCI registry so Argo can pull the Immich chart. |
-| `project-default.yaml` | The `default` AppProject. Core install lacks the API server that creates it. |
-| `root-app.yaml` | App-of-apps root, pointed at `argocd/apps/`. |
-| `apps/immich.yaml` | Immich: official chart + `apps/immich/values.yaml` + `pvc`, `postgres`, `nodeport` manifests. `prune: false` so a bad commit cannot delete the photo volume. |
-| `apps/monitoring.yaml` | Prometheus + Grafana chart + `platform/monitoring/` values, alert rules, Grafana entry point. |
+| `install.sh` | Installs Argo CD core, creates the Grafana password (encrypted), applies `repos.yaml` and the root app. A preview unless `APPLY=1`. It refuses to run if you have unpushed changes. |
+| `repos.yaml` | Lets Argo CD pull the Immich chart from the GHCR registry |
+| `project-default.yaml` | The `default` project. The core install has no API server, which normally creates it. |
+| `root-app.yaml` | The root application, pointed at `argocd/apps/` |
+| `apps/*.yaml` | One application for each of: Immich, monitoring, Nextcloud, Vaultwarden, Jellyfin, qBittorrent, Homepage |
+
+Apps that hold data use `prune: false`. A mistaken commit then cannot delete a photo library or a database volume.
 
 ## Decisions and limits
 
-- **Argo CD "core" install:** no web UI, no dex, no API server. It saves RAM on a 15 GB machine. Use `argocd admin dashboard` for a UI when needed.
-- **Secrets are not synced by Argo yet.** `immich-db` and `grafana-admin` are created by the install scripts from the SOPS files. Full GitOps for secrets needs the KSOPS plugin and is deferred.
-- **Taking over a running Immich:** Argo renders the chart itself and adopts the existing resources. The old Helm release record stays but is unused. Do this when no upload is running, and watch the pods during the first sync.
-- **Untested:** none of these files has been applied. The OCI chart source, multi-source `$values` references and the node-exporter textfile mount are the likeliest places to need fixes.
+- **The "core" install** has no web page, no login server and no API server. It uses less memory. For a web page, run `argocd admin dashboard -n argocd`.
+- **Argo CD does not manage the secrets.** The `install.sh` scripts create them from the SOPS files. Managing them from Argo CD would need the KSOPS plugin, which is not set up.
+- **Immich:** Argo CD renders the chart itself and adopts the pods that `apps/immich/install.sh` created. The old Helm release record stays, unused. Do this when no upload is running, and watch the pods during the first sync.
 
-## Rollback
+## Undo
 
-`kubectl delete application root -n argocd` stops management (resources stay). `kubectl delete -n argocd -f core-install.yaml` removes Argo CD itself.
+- `kubectl delete application root -n argocd` stops Argo CD managing the apps. The apps keep running.
+- To remove Argo CD itself: `kubectl delete -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/<version>/manifests/core-install.yaml`

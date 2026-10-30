@@ -1,4 +1,4 @@
-# kube-prometheus-stack overrides. Tuned small: this PC also runs the photo library.
+# kube-prometheus-stack overrides. Kept small, so the monitoring leaves memory for the apps.
 
 alertmanager:
   enabled: false   # no receivers configured; alerts are visible in Prometheus/Grafana only

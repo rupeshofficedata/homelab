@@ -1,81 +1,104 @@
 # Architecture
 
-> [!NOTE]
-> Status: Phase 0 is **applied**. Phase 1a (Immich, tailnet access, nightly backup) is **Built**; restore with real photos, the iPhone upload and a reboot test are still **unverified**. Argo CD and monitoring are **Planned** (Phase 1b). See [roadmap.md](roadmap.md).
+How the pieces fit together, where the data lives, and how it moves.
 
 ## The picture
 
 ```mermaid
 flowchart LR
-  phone["iPhone<br/>Immich app"] -- "Tailscale (WireGuard)<br/>http://tailscale-ip:2283" --> ts
+  phone["Phone or laptop<br/>(Tailscale installed)"] -- "Tailscale (encrypted)" --> ts
 
-  subgraph pc["CachyOS PC (single node)"]
-    ts["tailscaled<br/>serve --tcp 2283"] --> np["NodePort 30283<br/>loopback only"]
-    np --> immich["Immich<br/>k3s pods"]
-    immich --> storage[("/srv/homelab/storage<br/>library + Postgres PVCs")]
+  subgraph pc["The server (one computer)"]
+    ts["Tailscale<br/>tailscale serve"] --> np["NodePort<br/>127.0.0.1 only"]
+    np --> apps["Apps on k3s<br/>Immich, Nextcloud, ..."]
+    apps --> storage[("/srv/homelab/storage<br/>app volumes")]
     restic["restic<br/>systemd timer 02:30"] --> storage
-    restic -- "pg_dump via kubectl exec" --> immich
-    argo["Argo CD<br/>(Phase 1b)"] -. "syncs manifests" .-> immich
+    restic -- "database dump<br/>via kubectl exec" --> apps
+    argo["Argo CD"] -. "keeps the apps equal to the repo" .-> apps
   end
 
-  restic -- "only if repo reachable" --> drive[("Backup Plus<br/>exFAT at /mnt/backup")]
-  gh["GitHub<br/>public repo"] -. "pulled by" .-> argo
+  restic -- "only if the drive is there" --> drive[("External drive<br/>/mnt/backup")]
+  gh["GitHub<br/>this repo"] -. "Argo CD pulls from it" .-> argo
 ```
 
-| Solid line | Data moves |
+A solid line is data moving. A dotted line is configuration moving. No photos and no plain-text secrets travel on a dotted line.
+
+## The parts
+
+| Part | Job |
 |---|---|
-| Dotted line | Configuration moves (no photos, no secrets in plain text) |
+| **k3s** | A small Kubernetes on one computer. Runs every app. Traefik and servicelb are switched off to save memory. NodePorts listen on `127.0.0.1` only. |
+| **Argo CD** | Watches this repo on GitHub. Makes the cluster match it. |
+| **Tailscale** | The only way in. No port is opened on the router. |
+| **Immich** | Photo and video library. Helm chart plus its own Postgres and valkey. |
+| **Nextcloud** | File sync. Own Postgres. |
+| **Vaultwarden** | Password manager. Data in a SQLite file. |
+| **Jellyfin** | Media server. Reads `/srv/homelab/media`. |
+| **qBittorrent** | Torrent client. Saves to `/srv/homelab/media/downloads`, so Jellyfin sees the files. |
+| **Homepage** | Start page with links to every app. |
+| **Prometheus and Grafana** | Metrics, graphs and three alerts (see below). |
+| **restic** | Nightly encrypted backup to the external drive. |
+| **SOPS + age** | Encrypts secrets so they can live in this public repo. |
 
-## Components
+## How a request reaches an app
 
-| Component | Role | Status |
-|-----------|------|--------|
-| **k3s** | Single-node Kubernetes (v1.36.5). Traefik and servicelb disabled to save RAM; NodePorts bound to loopback. | Built and running (`05-k3s.sh`) |
-| **Immich** | Photo and video library, iPhone auto-upload, face search. Official chart `0.13.4`, Immich `v3.2.0`, with valkey and a separate Postgres StatefulSet. | Built, pods Running; iPhone upload not yet verified |
-| **Tailscale** | Private network between PC, iPhone, laptop. No router ports opened. `tailscale serve --tcp` publishes Immich on the tailnet. | PC logged in; iPhone not yet seen |
-| **restic** | Encrypted, deduplicated nightly backup to the external drive, run by a host systemd timer. | Built; manual run and mechanical restore drill passed |
-| **Argo CD** | Keeps the cluster equal to the Git repo. | Planned (Phase 1b) |
-| **SOPS + age** | Encrypts secrets so they can live in a public repo. | Key generated (`04-secrets.sh`); first secrets in use (`immich-db`, `restic`); see [secrets.md](secrets.md) |
-| **Prometheus + Grafana** | Metrics and alerts (backup age, drive, disk, swap). | Planned (Phase 1b) |
+1. You open an address such as `http://<tailscale-ip>:2283`.
+2. Tailscale carries the request, encrypted, to the server.
+3. `tailscale serve` hands it to a **NodePort** on `127.0.0.1`.
+4. The NodePort leads to the app's pod.
 
-## Data flow
+Step 3 is the key to privacy. The NodePort only listens on `127.0.0.1`, so the home network cannot reach the app. Only Tailscale can.
 
-| Flow | Path | Protocol | Notes |
-|------|------|----------|-------|
-| Photo upload | iPhone -> `tailscaled` -> loopback NodePort 30283 -> Immich | Plain HTTP inside the WireGuard tunnel (no HTTPS certificate) | PC must be on and awake. iOS app behaviour with `http://` not yet verified |
-| Live data | Immich -> `/srv/homelab/storage` | local-path PVC | Copy 1 of your photos |
-| Backup | `backup.sh` (systemd timer) -> restic -> `/mnt/backup/homelab-restic` | restic repo (files) | Copy 2, same room. DB dumped with `pg_dump` through `kubectl exec` |
-| Config | GitHub -> Argo CD -> cluster | Git over HTTPS | Public repo, secrets SOPS-encrypted |
+| App | Tailscale address | NodePort |
+|---|---|---|
+| Immich | `http://<tailscale-ip>:2283` | 30283 |
+| Jellyfin | `http://<tailscale-ip>:8096` | 30096 |
+| qBittorrent | `http://<tailscale-ip>:8081` | 30081 |
+| Homepage | `http://<tailscale-ip>/` | 30800 |
+| Grafana | `http://<tailscale-ip>:3000` | 30300 |
+| Prometheus | `http://<tailscale-ip>:9090` | 30900 |
+| Nextcloud | `https://<name>.ts.net:8443` | 30443 |
+| Vaultwarden | `https://<name>.ts.net:8222` | 30222 |
 
-> [!WARNING]
-> Live data and the backup are two copies in **one place**. Fire, theft or a power surge can take both. An offsite copy is deferred to Phase 2. See [backup-restore.md](backup-restore.md).
+Nextcloud and Vaultwarden use HTTPS because their web apps and phone apps require it.
 
-## Storage layout
+## Where the data lives
 
 ```text
-/srv                       btrfs subvolume @srv (own subvolume, NOT covered by snapper)
-└── homelab/
-    ├── k3s/               k3s data-dir (containerd images, etcd/sqlite state)
-    └── storage/           local-path PVCs: Immich library, Postgres   (chattr +C)
-/mnt/backup                mountpoint for the exFAT drive              (chattr +i while empty)
+/srv/homelab/
+├── k3s/        k3s system files
+├── storage/    app volumes: photo library, databases, settings   (copy-on-write off)
+├── media/      movies, shows and downloads (Jellyfin, qBittorrent)
+└── files/      Nextcloud user files
+/mnt/backup     the external drive, mounted when first used        (read-only while empty)
 ```
 
-- **`/srv` is its own subvolume.** Snapper here only has a `root` config on `/`, so photos under `/srv` never inflate snapshots. No extra subvolume is needed.
-- **`chattr +C` on `storage/`** turns off copy-on-write for new files. This avoids heavy fragmentation for Postgres and large uploads. Side effect: no btrfs checksums or compression for those files, which is fine for JPEG/HEIC and acceptable because restic is the integrity layer. The flag must be set while the directory is empty; new files inherit it.
-- **`chattr +i` on the empty mountpoint** makes the bare directory immutable. If the drive is missing, a backup job cannot write into `/mnt/backup` on the SSD and fill it. Mounting over the directory still works.
+- **`/srv` is its own btrfs subvolume.** System snapshots of `/` do not include it, so photos cannot make the snapshots grow.
+- **Copy-on-write is off for `storage/`.** This avoids slow, fragmented databases. The cost is that btrfs cannot checksum those files. restic checks the backup instead.
+- **The empty `/mnt/backup` is read-only.** If the drive is missing, nothing can write to the main disk by mistake.
+- **`media/` and `files/` can be a bigger drive.** Mount the drive at that path and change nothing else.
 
-## Why each choice
+## Data flows
 
-| Choice | Reason | Details |
-|--------|--------|---------|
-| k3s | Smallest real Kubernetes; Argo CD needs a cluster | [decisions.md](decisions.md) |
-| Tailscale | Private by default, no VPS, free | [decisions.md](decisions.md) |
-| restic on a systemd timer | One static tool, encrypted, dedup, works on exFAT as plain files. A host timer avoids hostPath problems with the autofs drive | [decisions.md](decisions.md#10-backup-runner-systemd-timer-not-a-cronjob) |
-| Loopback NodePort + `tailscale serve` | The LAN cannot reach the app; only the tailnet can | [decisions.md](decisions.md#12-loopback-nodeport-and-tailscale-serve) |
-| Postgres StatefulSet | One pod, no operator, Immich's own tested image | [decisions.md](decisions.md#11-postgres-as-a-plain-statefulset) |
-| exFAT folder | Keeps the existing 605 GB untouched; restic repo is portable to any OS | [decisions.md](decisions.md) |
-| Public repo + SOPS | Portfolio-friendly; secrets safe if the age key stays private | [secrets.md](secrets.md) |
+| Flow | Path | Notes |
+|---|---|---|
+| Photo upload | phone → Tailscale → NodePort → Immich → `storage/` | The server must be on and awake |
+| Backup | `backup.sh` → restic → `/mnt/backup/homelab-restic` | Databases are saved with `pg_dump` through `kubectl exec` |
+| Configuration | GitHub → Argo CD → cluster | Public repo, secrets encrypted |
 
-## Resource budget (15 GB RAM, about 5 GB free)
+> [!WARNING]
+> The live data and the backup are two copies in **one place**. Fire, theft or a power surge can destroy both. An offsite copy is on the [roadmap](roadmap.md). Until then, keep irreplaceable files somewhere else too.
 
-Stop the kind clusters and Jenkins before k3s runs (`02-free-ram.sh`). Immich server and machine-learning pods are limited to 2 Gi each, Postgres to 1 Gi. During setup about 5 GB of swap was in use, so watch it: if swap stays above 4 GB for a week, fall back to Docker Compose for Phase 1 apps ([decisions.md](decisions.md)).
+## Alerts
+
+Prometheus has three alert rules in `platform/monitoring/rules.yaml`. There is no Alertmanager, so you see alerts in the Prometheus or Grafana web page. Nothing is sent to you.
+
+| Alert | Fires when |
+|---|---|
+| `BackupStale` | No successful backup for 26 hours, or no backup data at all |
+| `SrvDiskAlmostFull` | `/srv` is more than 80% full |
+| `HighSwapUse` | Swap is above 50% for 30 minutes |
+
+## Memory
+
+The apps have memory limits so one app cannot starve the rest. Immich server may use up to 4 Gi, Immich machine learning 2 Gi, Jellyfin 2 Gi, Nextcloud 512 Mi plus its database 1 Gi, Vaultwarden 256 Mi. Argo CD with Prometheus and Grafana add about 1.5 to 2 GB. If swap stays high for a week, the machine needs more memory (see [decisions.md](decisions.md#1-k3s-and-argo-cd-instead-of-docker-compose)).

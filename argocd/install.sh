@@ -1,53 +1,45 @@
 #!/usr/bin/env bash
-# install.sh - Phase 1b: install Argo CD (core) and hand the cluster to GitOps.
-# Dry run unless APPLY=1. Do NOT run while a big photo upload is in progress:
-# Argo, Prometheus and Grafana add ~1.5-2 GB RAM and Argo re-syncs Immich.
-source "$(dirname "$0")/../bootstrap/scripts/lib.sh"
-need kubectl sops openssl
+# install.sh - install Argo CD and hand the cluster over to GitOps.
+# GitOps = Argo CD reads this repo on GitHub and makes the cluster match it.
+# Preview by default. Use APPLY=1 to do it.
+# Tip: do not run this during a big photo upload. Argo CD, Prometheus and Grafana
+# need about 1.5 to 2 GB of memory, and Argo CD re-syncs Immich.
+HERE=$(cd "$(dirname "$0")" && pwd)
+source "$HERE/../bootstrap/scripts/lib.sh"
+need kubectl sops openssl git
 
 # renovate: datasource=github-releases depName=argoproj/argo-cd
-ARGO_VERSION=v3.4.12   # pinned; verify it is still a supported release before applying
-HERE=$(cd "$(dirname "$0")" && pwd)
-SECRET_REL=secrets/grafana-admin.enc.yaml
-export KUBECONFIG=${KUBECONFIG:-$KUBECONFIG_OUT}
-export SOPS_AGE_KEY_FILE=$AGE_KEY_FILE
-cd "$REPO_DIR"
+ARGO_VERSION=v3.4.12   # check that this is still a supported release before you apply
+SECRET_FILE=secrets/grafana-admin.enc.yaml
 
-# Refuse to hand over a repo that Argo cannot read: it pulls from GitHub, not this disk.
-if [[ -n $(git status --porcelain) || -n $(git log origin/main..HEAD 2>/dev/null) ]]; then
-  die "uncommitted or unpushed changes: Argo only sees what is on GitHub main"
-fi
-
-# 1. Argo CD "core": controller + repo-server + redis, no UI/API server/dex (saves RAM).
-#    Use `argocd admin dashboard` if you want the UI. --server-side: CRDs are large.
-run kubectl create namespace argocd --dry-run=client -o yaml
-if [[ $APPLY == 1 ]]; then
-  kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
-fi
-run kubectl apply -n argocd --server-side --force-conflicts \
-  -f "https://raw.githubusercontent.com/argoproj/argo-cd/$ARGO_VERSION/manifests/core-install.yaml"
-
-# 2. Grafana admin secret: generated once, committed ENCRYPTED, applied in memory.
-if [[ ! -f $SECRET_REL ]]; then
-  log "creating $SECRET_REL"
-  if [[ $APPLY == 1 ]]; then
-    pw=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9')
-    sops -e --filename-override "$SECRET_REL" --input-type yaml --output-type yaml /dev/stdin > "$SECRET_REL.tmp" <<YAML
+grafana_secret() {
+  cat <<YAML
 apiVersion: v1
 kind: Secret
 metadata: {name: grafana-admin, namespace: monitoring}
-stringData: {admin-user: admin, admin-password: "$pw"}
+stringData: {admin-user: admin, admin-password: "$(random_password)"}
 YAML
-    mv "$SECRET_REL.tmp" "$SECRET_REL"
-    log "commit $SECRET_REL (encrypted) so it survives a rebuild"
-  fi
-fi
-if [[ $APPLY == 1 ]]; then
-  kubectl create namespace monitoring --dry-run=client -o yaml | kubectl apply -f -
-  sops -d "$SECRET_REL" | kubectl apply -f -
+}
+
+# Argo CD reads from GitHub, not from this disk. Refuse if GitHub is behind.
+if [[ -n $(git status --porcelain) || -n $(git log origin/main..HEAD 2>/dev/null) ]]; then
+  die "you have uncommitted or unpushed changes. Argo CD only sees what is on GitHub (main)."
 fi
 
-# 3. Repo credentials for the OCI chart, then the root app: Argo takes over from here.
+# 1. Argo CD "core": the controller, repo-server and redis only.
+#    No web page, no login server. This saves memory.
+#    (Want a web page? Run: argocd admin dashboard -n argocd)
+#    --server-side is needed because the install files are large.
+create_namespace argocd
+run kubectl apply -n argocd --server-side --force-conflicts \
+  -f "https://raw.githubusercontent.com/argoproj/argo-cd/$ARGO_VERSION/manifests/core-install.yaml"
+
+# 2. The Grafana admin password. Made once, then stored encrypted in git.
+create_secret_file "$SECRET_FILE" grafana_secret
+create_namespace monitoring
+apply_secret "$SECRET_FILE"
+
+# 3. Tell Argo CD where the repo is, then give it the root app. It deploys everything else.
 run kubectl apply -f "$HERE/project-default.yaml"
 run kubectl apply -f "$HERE/repos.yaml"
 run kubectl apply -f "$HERE/root-app.yaml"

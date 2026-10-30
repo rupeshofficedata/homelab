@@ -1,23 +1,25 @@
 # apps/jellyfin/
 
-Media server. Plain http on the tailnet: `http://<tailscale-ip>:8096` (no HTTPS needed, unlike Vaultwarden).
+A media server for movies and shows. It uses plain `http` on your tailnet: `http://<tailscale-ip>:8096`.
+
+## Files
 
 | File | What it does |
 |---|---|
-| `jellyfin.yaml` | PVC (5Gi config + database), Deployment (non-root, no capabilities, 2Gi limit), media mounted **read-only** from `/srv/homelab/media`, loopback NodePort 30096. |
+| `jellyfin.yaml` | A 5 Gi volume (settings and database), the Deployment (non-root, no extra privileges, 2 Gi memory limit), the media folder `/srv/homelab/media` mounted **read-only**, and a private NodePort 30096 |
 
-Publish: `sudo tailscale serve --bg --tcp 8096 tcp://127.0.0.1:30096`.
+Publish it: `sudo tailscale serve --bg --tcp 8096 tcp://127.0.0.1:30096`.
 
-## Where the media goes (moving to another PC)
+## Where the media goes
 
-The manifest reads media from the host folder `/srv/homelab/media`. That path is the only contract:
+The app reads media from the host folder `/srv/homelab/media`. That folder is the only agreement between the app and the machine:
 
-- **This PC:** a plain folder on the SSD (small library).
-- **New PC (256G SSD + 2TB SATA drive):** format the SATA drive (ext4), mount it at `/srv/homelab/media` in `/etc/fstab`, copy media in. No manifest change.
+- By default it is a normal folder on the main disk.
+- For a big library, format a separate drive (for example ext4), mount it at `/srv/homelab/media` in `/etc/fstab`, and copy your media in. Nothing in the manifest changes.
 
-In Jellyfin: Dashboard -> Libraries -> add a library with folder `/media` (or a subfolder like `/media/movies`).
+In Jellyfin: Dashboard, Libraries, add a library and choose the folder `/media` (or a subfolder like `/media/movies`).
 
 ## Known gaps
 
-- **CPU transcoding only.** GPU needs per-machine setup (NVIDIA container toolkit + k3s runtime). Direct play needs no transcoding.
-- **Config is not in the nightly restic backup.** The library is rebuildable by rescanning, but users and watch history are not. Use Dashboard -> Backups (built into Jellyfin) until this is wired in.
+- **CPU transcoding only.** A GPU needs extra setup on each machine. Direct play does not transcode, so it works without a GPU.
+- **Settings are not in the nightly backup.** Libraries can be scanned again, but users and watch history cannot. Use Dashboard, Backups (built into Jellyfin) until this is added.

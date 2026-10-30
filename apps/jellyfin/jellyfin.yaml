@@ -1,6 +1,6 @@
 # Jellyfin: media server (CPU transcoding only; GPU is a later, per-machine step).
-# Media is read from the host folder /srv/homelab/media. On a new machine, mount the big
-# drive there (fstab) and nothing else changes. Config/database is a 5Gi PVC on the SSD.
+# Media is read from the host folder /srv/homelab/media. To use a bigger drive, mount it
+# at that path and nothing else changes. Config and database are a 5Gi volume.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata: {name: jellyfin-config, namespace: jellyfin}

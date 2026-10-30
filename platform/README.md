@@ -1,16 +1,12 @@
 # platform/
 
-Cluster services that support the apps. **`backup/` is built; `monitoring/` arrives in Phase 1b.**
+Services that support the apps.
 
-## Planned layout
-
-```
+```text
 platform/
-  backup/       restic systemd timer: nightly library + DB dump to /mnt/backup (BUILT, Phase 1a)
-  monitoring/   kube-prometheus-stack: Prometheus + Grafana, 7-day retention (Phase 1b)
+  backup/       the nightly backup (restic + systemd timer)
+  monitoring/   Prometheus and Grafana (deployed by Argo CD)
 ```
 
-## Design notes
-
-- The backup job checks the drive before writing and fails loudly if it is absent. See [backup/README.md](backup/README.md).
-- Monitoring alerts planned: backup older than 26 h, drive not mounted, SSD above 80 %, high swap.
+- The backup job checks that the drive is there before it writes, and fails with a clear message if it is not. See [backup/README.md](backup/README.md).
+- Monitoring has three alerts: backup older than 26 hours, `/srv` above 80% full, and swap above 50% for 30 minutes. See [monitoring/README.md](monitoring/README.md).

@@ -1,21 +1,22 @@
 #!/usr/bin/env bash
-# 05-k3s.sh - install single-node k3s with the repo's config.
-# Runs the official installer (get.k3s.io) as root: read $tmp first if unsure.
+# 05-k3s.sh - install k3s (a small, single-node Kubernetes) with this repo's settings.
+# It downloads the official installer and runs it as root, so the dry run shows you the steps first.
 source "$(dirname "$0")/lib.sh"
 need curl sed
 [[ -d $HOMELAB_ROOT/storage ]] || die "run 03-storage.sh first"
 
-# Render the config template (single source of truth: config.env).
-cfg=$(mktemp); script=$(mktemp); trap 'rm -f "$cfg" "$script"' EXIT
-sed "s|@HOMELAB_ROOT@|$HOMELAB_ROOT|g" "$BOOT_DIR/k3s-config.yaml" > "$cfg"
-run sudo install -D -m 600 "$cfg" /etc/rancher/k3s/config.yaml
+# Fill the data folder into the config template, then install it where k3s looks for it.
+config=$(mktemp); installer=$(mktemp)
+trap 'rm -f "$config" "$installer"' EXIT
+sed "s|@HOMELAB_ROOT@|$HOMELAB_ROOT|g" "$BOOT_DIR/k3s-config.yaml" > "$config"
+run sudo install -D -m 600 "$config" /etc/rancher/k3s/config.yaml
 
-# Download first, then run, so the script is on disk and inspectable.
-# ponytail: tracks the stable channel; pin INSTALL_K3S_VERSION once it works.
-run curl -sfL https://get.k3s.io -o "$script"
-run sudo env INSTALL_K3S_CHANNEL=stable sh "$script"
+# Save the installer to a file first, so you can read it before it runs.
+# It follows the "stable" k3s release. To lock a version, add INSTALL_K3S_VERSION=<version>.
+run curl -sfL https://get.k3s.io -o "$installer"
+run sudo env INSTALL_K3S_CHANNEL=stable sh "$installer"
 
-# Separate kubeconfig: existing kind contexts in ~/.kube/config stay untouched.
+# Give your user its own kubeconfig file (kubectl reads it to find the cluster).
 run mkdir -p "$(dirname "$KUBECONFIG_OUT")"
 run sudo install -o "$USER" -m 600 /etc/rancher/k3s/k3s.yaml "$KUBECONFIG_OUT"
-log "use it:  bash/zsh: export KUBECONFIG=$KUBECONFIG_OUT   fish: set -x KUBECONFIG $KUBECONFIG_OUT"
+log "use it in bash or zsh with:  export KUBECONFIG=$KUBECONFIG_OUT"

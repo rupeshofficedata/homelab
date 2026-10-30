@@ -1,37 +1,45 @@
 #!/usr/bin/env bash
-# 03-storage.sh - data directories on the SSD and the backup-drive mount.
-# Idempotent: safe to re-run. Touches only $HOMELAB_ROOT, $BACKUP_MOUNT and
-# one line in /etc/fstab. Never formats or writes to the drive itself.
+# 03-storage.sh - create the data folders and set up the backup drive.
+# Safe to run again: it skips what already exists.
+# It touches only $HOMELAB_ROOT, $BACKUP_MOUNT and one line in /etc/fstab.
+# It never formats the drive and never writes files onto it.
 source "$(dirname "$0")/lib.sh"
-need findmnt chattr lsblk
+need findmnt chattr lsblk blkid
 
-[[ $(findmnt -no FSTYPE -T "$(dirname "$HOMELAB_ROOT")") == btrfs ]] || die "$(dirname "$HOMELAB_ROOT") is not btrfs"
+data_parent=$(dirname "$HOMELAB_ROOT")
+[[ $(findmnt -no FSTYPE -T "$data_parent") == btrfs ]] || die "$data_parent is not btrfs"
 
-# 1. Data dirs. +C = no copy-on-write (better for Postgres, fewer fragments).
-#    New files inherit +C, so set it while the dir is still empty.
-# ponytail: +C covers photos too (loses btrfs checksums for them); split Postgres out if you want bit-rot detection.
-run sudo mkdir -p "$HOMELAB_ROOT"/{k3s,storage,media,files}   # media/files: bulk data (Jellyfin, Nextcloud); mount the big drive under these
+# --- 1. Data folders --------------------------------------------------------------
+#   k3s/      k3s system files
+#   storage/  app volumes (databases, photo library, settings)
+#   media/    movies and shows (Jellyfin reads them)
+#   files/    user files (Nextcloud)
+# "chattr +C" turns off copy-on-write for storage/. This is faster for databases.
+# Only NEW files get the setting, so run it while the folder is still empty.
+run sudo mkdir -p "$HOMELAB_ROOT"/{k3s,storage,media,files}
 run sudo chattr +C "$HOMELAB_ROOT/storage"
 
-# 2. Backup mountpoint. +i on the EMPTY directory makes writes fail while the
-#    drive is absent, so a backup job can never fill the SSD by accident.
-#    It must be set while nothing is mounted there.
-mountpoint -q "$BACKUP_MOUNT" && die "$BACKUP_MOUNT is mounted; unmount it first"
+# --- 2. Empty mount point for the backup drive ---------------------------------------
+# "chattr +i" makes the empty folder read-only. If the drive is unplugged,
+# a backup can then never fill the main disk by accident.
+# The drive can still mount on top of it. Set this while nothing is mounted there.
+if mountpoint -q "$BACKUP_MOUNT"; then die "$BACKUP_MOUNT is mounted. Unmount it first."; fi
 run sudo mkdir -p "$BACKUP_MOUNT"
 run sudo chattr +i "$BACKUP_MOUNT"
 
-# 3. fstab entry by UUID. automount = mounts on first access, nofail = boot
-#    never hangs when the drive is unplugged.
-dev=$(sudo blkid -L "$BACKUP_LABEL") || die "no drive labelled '$BACKUP_LABEL'"   # -L prints the device path
-uuid=$(sudo blkid -s UUID -o value "$dev")
-other=$(findmnt -rno TARGET -S "UUID=$uuid" || true)
-[[ -z $other ]] || die "drive already mounted at $other; unmount it first (udisksctl unmount -b /dev/disk/by-uuid/$uuid)"
+# --- 3. Mount the drive automatically --------------------------------------------------
+# automount = the drive mounts the first time something opens the folder.
+# nofail    = the computer still boots if the drive is unplugged.
+device=$(sudo blkid -L "$BACKUP_LABEL") || die "no drive has the label '$BACKUP_LABEL'"
+uuid=$(sudo blkid -s UUID -o value "$device")
+mounted_at=$(findmnt -rno TARGET -S "UUID=$uuid" || true)
+[[ -z $mounted_at ]] || die "the drive is already mounted at $mounted_at. Unmount it first: udisksctl unmount -b /dev/disk/by-uuid/$uuid"
 
 if grep -q " $BACKUP_MOUNT " /etc/fstab; then
-  log "fstab entry for $BACKUP_MOUNT exists; nothing to add"
+  log "/etc/fstab already has a line for $BACKUP_MOUNT: nothing to add"
 else
-  line="UUID=$uuid $BACKUP_MOUNT exfat uid=$(id -u),gid=$(id -g),umask=022,nofail,x-systemd.automount,x-systemd.idle-timeout=60 0 0"
-  run sudo sh -c "printf '%s\n' '$line' >> /etc/fstab"
+  fstab_line="UUID=$uuid $BACKUP_MOUNT exfat uid=$(id -u),gid=$(id -g),umask=022,nofail,x-systemd.automount,x-systemd.idle-timeout=60 0 0"
+  run sudo sh -c "printf '%s\n' '$fstab_line' >> /etc/fstab"
   run sudo systemctl daemon-reload
   run sudo systemctl start "$(systemd-escape -p --suffix=automount "$BACKUP_MOUNT")"
 fi

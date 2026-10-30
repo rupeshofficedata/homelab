@@ -1,4 +1,5 @@
-# Public repo: only SOPS-encrypted secrets may be committed.
+# This repo is public. Only SOPS-encrypted secrets may be committed.
+# Plain (decrypted) secrets and keys:
 *.dec.yaml
 *.dec.yml
 age.key
@@ -7,8 +8,9 @@ keys.txt
 .env
 kubeconfig*
 
-# Local state and tooling
+# Your own machine settings (see bootstrap/config.env)
+bootstrap/config.local.env
+
+# Local cache and logs
 .cache/
-.remember/
 *.log
-.superpowers/

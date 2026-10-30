@@ -1,31 +1,22 @@
 #!/usr/bin/env bash
-# install.sh - create the private half of the Vaultwarden config (DOMAIN with the
-# tailnet name), encrypt it with SOPS and apply it. Dry run unless APPLY=1.
-# The Deployment is deployed by Argo CD (argocd/apps/vaultwarden.yaml).
+# install.sh - prepare the private settings for Vaultwarden (password manager).
+# It stores the web address (which contains your Tailscale name) as an encrypted secret.
+# Run it once, before Argo CD deploys the app (argocd/apps/vaultwarden.yaml).
+# Preview by default. Use APPLY=1 to do it.
 source "$(dirname "$0")/../../bootstrap/scripts/lib.sh"
 need kubectl sops tailscale python3
 
-SECRET_REL=secrets/vaultwarden.enc.yaml
-export KUBECONFIG=${KUBECONFIG:-$KUBECONFIG_OUT}
-export SOPS_AGE_KEY_FILE=$AGE_KEY_FILE
-cd "$REPO_DIR"
+SECRET_FILE=secrets/vaultwarden.enc.yaml
 
-run kubectl create namespace vaultwarden --dry-run=client -o yaml
-[[ $APPLY == 1 ]] && kubectl create namespace vaultwarden --dry-run=client -o yaml | kubectl apply -f -
-
-if [[ ! -f $SECRET_REL ]]; then
-  log "creating $SECRET_REL"
-  if [[ $APPLY == 1 ]]; then
-    fq=$(tailscale status --json | python3 -c "import json,sys;print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))")
-    sops -e --filename-override "$SECRET_REL" --input-type yaml --output-type yaml /dev/stdin > "$SECRET_REL.tmp" <<YAML
+private_settings() {
+  cat <<YAML
 apiVersion: v1
 kind: Secret
 metadata: {name: vaultwarden-private, namespace: vaultwarden}
-stringData: {domain: "https://$fq:8222"}
+stringData: {domain: "https://$(tailnet_name):8222"}
 YAML
-    mv "$SECRET_REL.tmp" "$SECRET_REL"
-  fi
-fi
-log "applying decrypted secret to the cluster (in memory only)"
-[[ $APPLY == 1 ]] && sops -d "$SECRET_REL" | kubectl apply -f -
-exit 0
+}
+
+create_namespace vaultwarden
+create_secret_file "$SECRET_FILE" private_settings
+apply_secret "$SECRET_FILE"

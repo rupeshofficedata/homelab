@@ -1,8 +1,9 @@
 # Nextcloud: file sync and sharing. Own Postgres, no Redis (single user; DB locking is enough).
-# Layout (apps and databases on the SSD, bulk data on the big drive):
-#   nextcloud-html PVC  (SSD)  app code + config.php
-#   nextcloud-postgres PVC (SSD) database
-#   /srv/homelab/files  (hostPath) user files; on a new PC mount the big drive here
+# Where the data lives:
+#   nextcloud-html volume      app code and config.php (on the main disk)
+#   nextcloud-postgres volume  the database (on the main disk)
+#   /srv/homelab/files         user files, a host folder. To use a bigger drive,
+#                              mount that drive at this path.
 # Private values (passwords, tailnet name) live in the SOPS secret `nextcloud-private`.
 apiVersion: v1
 kind: PersistentVolumeClaim

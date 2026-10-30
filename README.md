@@ -1,64 +1,77 @@
 # HomeLab
 
-Self-hosted photo backup and personal cloud, run as code. Started with **iPhone photos → Immich → nightly encrypted backup to an external drive**, built so the whole setup moves to another PC with `git clone` + a key + the drive.
+A small home server you can rebuild from this repository. It runs your own photo library, file sync, password manager, media server and torrent client. Only your own devices can reach it. Every night it backs up to an external drive.
 
-> [!NOTE]
-> **Status: Phases 0, 1a and 1b applied; Phase 1a built (Immich on k3s, reachable on the tailnet, nightly restic backup to the external drive).** First manual backup and a mechanical restore drill passed. **Verified with 8 real photos:** backup run (37 MiB snapshot), restore into a scratch dir (checksums identical to live) and DB restore into a scratch database (8 assets), unplugged-drive test (job fails, SSD unchanged). **Reboot test passed** (k3s, Immich, Tailscale forward, drive automount and backup timer all came back on their own). **Phase 1b applied:** Argo CD (core) manages Immich and monitoring from this repo; Prometheus + Grafana run, the backup-age metric is scraped, only the Watchdog alert fires. The nightly timer's first scheduled run (02:30) succeeded. Restore drill on 312 uploaded files matched live (312/312), `restic check` clean. **Phase 2 apps restore-tested** (Vaultwarden DB: integrity ok, 1 user, 397 items; Nextcloud: DB dump restored into a scratch database and the file tree matches live apart from edits made after the snapshot). Not yet done: age key copy in a cloud password manager, GitHub secret scanning. Anything marked *Planned* in the docs is design, not tested behaviour.
+Everything is written as code. To move to another computer you need three things: this repo, one secret key, and the backup drive.
 
-## Architecture
+## What it runs
+
+| App | What it is for |
+|---|---|
+| **Immich** | Photo and video library (like Google Photos) |
+| **Nextcloud** | File sync and sharing |
+| **Vaultwarden** | Password manager (works with Bitwarden apps) |
+| **Jellyfin** | Movies and shows |
+| **qBittorrent** | Torrent downloads |
+| **Homepage** | One start page with links to every app |
+| **Grafana and Prometheus** | Graphs and alerts about the server |
+
+## How it fits together
 
 ```mermaid
 flowchart LR
-  phone["iPhone<br/>Immich app"] -- "Tailscale (private)" --> ts
-  subgraph pc["CachyOS PC"]
-    ts["tailscale serve<br/>TCP forward"] --> immich["Immich on k3s"]
-    immich --> data[("/srv/homelab/storage")]
-    restic["restic (systemd timer)<br/>nightly 02:30"] --> data
+  phone["Your phone or laptop<br/>(Tailscale installed)"] -- "private Tailscale network" --> ts
+  subgraph pc["The home server"]
+    ts["Tailscale"] --> apps["Apps on k3s<br/>(Immich, Nextcloud, ...)"]
+    apps --> data[("/srv/homelab<br/>app data")]
+    backup["Nightly backup<br/>(restic, 02:30)"] --> data
   end
-  restic --> drive[("Backup Plus drive<br/>exFAT, /mnt/backup")]
-  gh["GitHub repo (public)"] -. "Argo CD pulls (Phase 1b)" .-> pc
+  backup --> drive[("External drive<br/>/mnt/backup")]
+  gh["This repo on GitHub"] -. "Argo CD copies it to the cluster" .-> apps
 ```
 
-| Layer | Choice | Why |
+| Tool | What it does | Why we chose it |
 |---|---|---|
-| Cluster | k3s, single node | GitOps with Argo CD; lighter than full Kubernetes |
-| Photos | Immich | Google Photos-like, official iOS app |
-| Backup | restic → external drive | Encrypted, deduplicated, plain files readable on any OS |
-| Access | Tailscale | Private, no router ports, no VPS |
-| Secrets | SOPS + age | Encrypted secrets can live in a public repo |
+| **k3s** | Runs the apps (a small version of Kubernetes) | Light, and works with Argo CD |
+| **Argo CD** | Makes the cluster match this repo | Change the repo, the server follows |
+| **Tailscale** | Private network between your devices and the server | No open router ports |
+| **restic** | Encrypted nightly backup | One program, plain files, works on any system |
+| **SOPS + age** | Encrypts secrets so they can live in a public repo | Passwords stay private, config stays in git |
 
-Full reasoning: [docs/decisions.md](docs/decisions.md).
+The reasons in detail: [docs/decisions.md](docs/decisions.md).
 
-## Repository map
+## What is in this repo
 
-| Path | What it holds | README |
+| Folder | What it holds | Guide |
 |---|---|---|
-| [`bootstrap/`](bootstrap/) | Phase 0 scripts: prechecks, storage, drive mount, age key, k3s | [bootstrap/README.md](bootstrap/README.md) |
-| [`apps/`](apps/) | One folder per app (Immich first) | [apps/README.md](apps/README.md) |
-| [`platform/`](platform/) | Backup job, monitoring | [platform/README.md](platform/README.md) |
-| [`argocd/`](argocd/) | Argo CD root app (GitOps) | [argocd/README.md](argocd/README.md) |
-| [`secrets/`](secrets/) | SOPS-encrypted secrets only | [secrets/README.md](secrets/README.md) |
-| [`.githooks/`](.githooks/) | Pre-commit guard for the public repo | below |
-| [`docs/`](docs/) | The guide: start at [docs/README.md](docs/README.md) | |
+| [`bootstrap/`](bootstrap/) | Scripts that prepare the computer: storage, backup drive, secret key, k3s | [bootstrap/README.md](bootstrap/README.md) |
+| [`apps/`](apps/) | One folder per app | [apps/README.md](apps/README.md) |
+| [`platform/`](platform/) | The nightly backup and the monitoring | [platform/README.md](platform/README.md) |
+| [`argocd/`](argocd/) | Argo CD setup (the GitOps part) | [argocd/README.md](argocd/README.md) |
+| [`secrets/`](secrets/) | Encrypted secrets, and nothing else | [secrets/README.md](secrets/README.md) |
+| [`.githooks/`](.githooks/) | A check that runs before every commit and blocks secrets | [docs/secrets.md](docs/secrets.md#the-pre-commit-check) |
+| [`docs/`](docs/) | The full guide. Start with [docs/README.md](docs/README.md) | |
 
-## Quick start (Phase 0)
+## Quick start
 
-Every script is a **dry run** unless you set `APPLY=1`.
+Install these programs first: `age`, `sops`, `gitleaks`, `restic`, `tailscale`, `helm`, `kubectl`, `docker`, `shellcheck`.
+
+Every script only **previews** what it would do. Add `APPLY=1` to do it for real.
 
 ```bash
-sudo pacman -S age sops gitleaks restic tailscale shellcheck   # tools
-./bootstrap/scripts/01-preflight.sh                            # read-only checks
-./bootstrap/scripts/02-free-ram.sh                             # preview; APPLY=1 to stop kind/Jenkins
+./bootstrap/scripts/01-preflight.sh           # check the computer (changes nothing)
+./bootstrap/scripts/03-storage.sh             # preview
+APPLY=1 ./bootstrap/scripts/03-storage.sh     # do it
 ```
 
-Then 03 → 04 → 05, each previewed first. Full walkthrough with checks and rollback: [docs/getting-started.md](docs/getting-started.md).
+Then scripts 04 and 05 the same way. The full walkthrough, with a check and an undo for every step: [docs/getting-started.md](docs/getting-started.md).
 
-## Safety rules for this public repo
+## Rules for this public repo
 
-- Only SOPS-encrypted files may live in `secrets/`. The private age key never enters git.
-- `.githooks/pre-commit` blocks unencrypted secrets, runs `gitleaks`, and syntax-checks shell scripts. It is enabled with `git config core.hooksPath .githooks`.
-- Keep out of the repo: domain names, public IPs, tailnet and device names, photos.
+- Only SOPS-encrypted files may be in `secrets/`. The private age key never goes into git.
+- The pre-commit check blocks plain-text secrets and runs `gitleaks`. Turn it on once with `git config core.hooksPath .githooks`.
+- Keep these out of the repo: domain names, public IP addresses, Tailscale network and device names, and your own photos.
 
 ## Roadmap
 
-[docs/roadmap.md](docs/roadmap.md): Phase 1a photos + backup + restore drill → 1b Argo CD + monitoring → 2 Jellyfin, Nextcloud, Vaultwarden, dashboard, offsite copy.
+What is built and what comes next: [docs/roadmap.md](docs/roadmap.md).

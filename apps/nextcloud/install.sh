@@ -1,40 +1,32 @@
 #!/usr/bin/env bash
-# install.sh - create the user-files folder and the private half of the Nextcloud
-# config (passwords + tailnet name), encrypt it with SOPS, apply it. Dry run unless APPLY=1.
-# The workloads are deployed by Argo CD (argocd/apps/nextcloud.yaml).
+# install.sh - prepare Nextcloud (file sync): the files folder and the private settings.
+# The settings (passwords and your Tailscale name) are stored as an encrypted secret.
+# Run it once, before Argo CD deploys the app (argocd/apps/nextcloud.yaml).
+# Preview by default. Use APPLY=1 to do it.
 source "$(dirname "$0")/../../bootstrap/scripts/lib.sh"
 need kubectl sops tailscale python3 openssl
 
-SECRET_REL=secrets/nextcloud.enc.yaml
-export KUBECONFIG=${KUBECONFIG:-$KUBECONFIG_OUT}
-export SOPS_AGE_KEY_FILE=$AGE_KEY_FILE
-cd "$REPO_DIR"
+SECRET_FILE=secrets/nextcloud.enc.yaml
+WWW_DATA_UID=33   # the user Nextcloud runs as inside its container
 
-# Files folder: the pod's www-data (uid 33) must own it.
-run sudo install -d -o 33 -g 33 "$HOMELAB_ROOT/files"
-run kubectl create namespace nextcloud --dry-run=client -o yaml
-[[ $APPLY == 1 ]] && kubectl create namespace nextcloud --dry-run=client -o yaml | kubectl apply -f -
-
-if [[ ! -f $SECRET_REL ]]; then
-  log "creating $SECRET_REL"
-  if [[ $APPLY == 1 ]]; then
-    fq=$(tailscale status --json | python3 -c "import json,sys;print(json.load(sys.stdin)['Self']['DNSName'].rstrip('.'))")
-    dbpw=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9')
-    adminpw=$(openssl rand -base64 24 | tr -dc 'A-Za-z0-9')
-    sops -e --filename-override "$SECRET_REL" --input-type yaml --output-type yaml /dev/stdin > "$SECRET_REL.tmp" <<YAML
+private_settings() {
+  local host
+  host=$(tailnet_name)
+  cat <<YAML
 apiVersion: v1
 kind: Secret
 metadata: {name: nextcloud-private, namespace: nextcloud}
 stringData:
-  db-password: "$dbpw"
+  db-password: "$(random_password)"
   admin-user: admin
-  admin-password: "$adminpw"
-  host: "$fq"
-  host-port: "$fq:8443"
+  admin-password: "$(random_password)"
+  host: "$host"
+  host-port: "$host:8443"
 YAML
-    mv "$SECRET_REL.tmp" "$SECRET_REL"
-  fi
-fi
-log "applying decrypted secret to the cluster (in memory only)"
-[[ $APPLY == 1 ]] && sops -d "$SECRET_REL" | kubectl apply -f -
-exit 0
+}
+
+# The folder for user files must belong to the Nextcloud user.
+run sudo install -d -o "$WWW_DATA_UID" -g "$WWW_DATA_UID" "$HOMELAB_ROOT/files"
+create_namespace nextcloud
+create_secret_file "$SECRET_FILE" private_settings
+apply_secret "$SECRET_FILE"

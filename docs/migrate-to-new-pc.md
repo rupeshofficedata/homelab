@@ -1,88 +1,128 @@
-# Migrate to a new PC
+# Move to another computer
+
+Use this page to rebuild HomeLab on a new computer.
 
 > [!WARNING]
-> **Planned, untested.** Written before the stack exists. Rehearse it once (use the [restore drill](backup-restore.md#restore-drill) as the dry run) before you depend on it.
+> Practise this once before you need it. The [restore drill](backup-restore.md#restore-drill) is a good dry run.
 
-## Have these in hand first
+## What you need first
 
-| Item | Where it is | If missing |
-|------|-------------|------------|
-| Backup drive "Backup Plus" | Your desk | Nothing to restore from |
-| restic password | Cloud password manager (and a copy on the drive) | Backup is unreadable |
-| age private key | Cloud password manager (and a copy on the drive) | Secrets must be recreated ([secrets.md](secrets.md)) |
-| This repo's URL | GitHub (public) | `git clone` fails |
-| Tailscale account | Your login | Re-join devices manually |
+| Item | Where it should be | If you do not have it |
+|---|---|---|
+| The backup drive | At hand | There is nothing to restore from |
+| The restic password | Password manager, and a copy on the drive | The backups cannot be opened |
+| The age private key | Password manager, and a copy on the drive | You must create new secrets ([secrets.md](secrets.md)) |
+| The repo URL | GitHub | `git clone` fails |
+| Your Tailscale login | Your account | Join the devices again by hand |
 
-## Steps
+## The steps
 
 ```mermaid
 flowchart TD
-  a["1. Prepare the new PC"] --> b["2. Clone repo + restore age key"]
-  b --> c["3. Phase 0 scripts: storage, k3s"]
-  c --> d["4. Install Argo CD + apply root app"]
-  d --> e["5. Stop Immich (scale 0)"]
-  e --> f["6. restic restore into PVC paths"]
-  f --> g["7. Start Immich, verify"]
+  a["1. Install Linux and tools"] --> b["2. Clone the repo, restore the age key"]
+  b --> c["3. Run scripts 01, 03 and 05"]
+  c --> d["4. Install Argo CD"]
+  d --> e["5. Stop the apps that write data"]
+  e --> f["6. restic restore"]
+  f --> g["7. Start the apps and check"]
 ```
 
-### 1. Prepare the new PC
+### 1. Prepare the computer
 
-Install Linux, then the tools:
+Install Linux. Then install the tools: `git`, `age`, `sops`, `restic`, `tailscale`, `helm`, `kubectl`. Install Docker only if you use `02-free-ram.sh`.
 
 ```bash
-sudo pacman -S git age sops restic tailscale docker helm kubectl   # Arch-family; adjust per distro
-sudo systemctl enable --now tailscaled && sudo tailscale up
+sudo systemctl enable --now tailscaled
+sudo tailscale up
 ```
-
-Docker is only needed if you want your kind clusters; k3s does not require it. Join the PC to your tailnet.
 
 ### 2. Clone the repo and restore the age key
 
 ```bash
-git clone <your repo url> ~/Projects/HomeLab && cd ~/Projects/HomeLab
+git clone <your repo url> ~/HomeLab && cd ~/HomeLab
 mkdir -p ~/.config/sops/age
-# paste or copy the key from your password manager / the drive:
-install -m 600 /path/to/keys.txt ~/.config/sops/age/keys.txt
+install -m 600 /path/to/keys.txt ~/.config/sops/age/keys.txt    # the key from your password manager or the drive
 ```
 
-The repo gives you all manifests. The key is the only thing not in it. Do not run `04-secrets.sh` with `APPLY=1`: it would create a *new* key.
+The repo has every manifest. The key is the only thing it does not have.
+
+> [!WARNING]
+> Do **not** run `04-secrets.sh` with `APPLY=1`. It would make a new key, and your old secrets could no longer be opened.
 
 ### 3. Storage and k3s
 
-Plug in the drive, then run Phase 0 steps 1, 3 and 5 from [getting-started.md](getting-started.md) (`01-preflight`, `03-storage`, `05-k3s`). Skip `04-secrets` and `02-free-ram` unless needed.
+Plug in the drive. Then run the scripts from [getting-started.md](getting-started.md): `01-preflight.sh`, `03-storage.sh` and `05-k3s.sh`. Skip `04-secrets.sh`. Skip `02-free-ram.sh` unless you need it.
 
-### 4. Argo CD and the root app (Planned, Phase 1b)
+If you have a separate big drive for media and files, mount it at `/srv/homelab/media` and `/srv/homelab/files` (in `/etc/fstab`) before you start the apps. No manifest changes are needed.
 
-Install Argo CD with the KSOPS plugin, create the age key as a Kubernetes Secret for it, then apply the root app-of-apps from `argocd/`. Argo creates every app, empty. Exact commands will be written into `bootstrap/` when Phase 1b is built.
-
-### 5. Scale Immich to zero
+### 4. Argo CD and the apps
 
 ```bash
-kubectl -n immich scale deploy --all --replicas=0
+APPLY=1 ./argocd/install.sh
 ```
 
-Stops the app so nothing writes while you restore.
+Then run the `install.sh` of each app that has one (Immich, Vaultwarden, Nextcloud, Homepage). The encrypted secret files are already in the repo, so the scripts decrypt them with your age key and apply them. Argo CD then creates all the apps, with empty data.
 
-### 6. Restore data
+### 5. Pause Argo CD and stop the apps
+
+Argo CD would start the apps again while you restore. Pause it first, then stop the apps. The databases (StatefulSets) keep running, because you need them for the restore.
+
+```bash
+kubectl -n argocd scale statefulset argocd-application-controller --replicas=0
+kubectl -n immich scale deploy --all --replicas=0
+kubectl -n vaultwarden scale deploy --all --replicas=0
+kubectl -n nextcloud scale deploy --all --replicas=0
+```
+
+### 6. Restore the data
+
+First restore everything into a scratch folder. This never touches live data.
 
 ```bash
 export RESTIC_REPOSITORY=/mnt/backup/homelab-restic
-restic snapshots
-restic restore latest --target /
+sudo -E restic snapshots
+sudo -E restic restore latest --target /var/tmp/restore    # asks for the restic password
 ```
 
-Opens the repository (asks for the restic password) and writes the files back to their original paths under `/srv/homelab/storage`. Check the target paths with `--dry-run` first. Then load the Immich DB dump as described in the Immich documentation for the pinned version.
-
-### 7. Start and verify
+The new cluster named its volume folders itself, so the names differ from the old server. Look at them and copy each restored folder into the matching new one:
 
 ```bash
-kubectl -n immich scale deploy --all --replicas=1
+ls /srv/homelab/storage          # new folders, e.g. pvc-<id>_immich_immich-library
+find /var/tmp/restore/srv/homelab/storage -maxdepth 1    # restored folders
+sudo rsync -a /var/tmp/restore/srv/homelab/storage/<old immich-library folder>/ /srv/homelab/storage/<new immich-library folder>/
 ```
 
-- [ ] Immich UI loads over the tailnet
-- [ ] Old photos and videos open; photo count matches the old server
-- [ ] Face groups and albums are present (DB restored)
-- [ ] iPhone app points at the new tailnet address and uploads a new photo
-- [ ] Nightly restic job runs once successfully on the new PC
+Do the same for the Vaultwarden data folder and the Nextcloud app folder (`..._nextcloud_nextcloud-html`). Nextcloud user files go to `/srv/homelab/files`:
 
-Keep the old PC and its data until every box is ticked.
+```bash
+sudo rsync -a /var/tmp/restore/srv/homelab/files/ /srv/homelab/files/
+```
+
+Then load each database dump into its running Postgres pod:
+
+```bash
+dump=$(sudo find /var/tmp/restore -name immich.pgdump)
+sudo cat "$dump" | kubectl -n immich exec -i immich-postgres-0 -- \
+  sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --clean --if-exists'
+```
+
+Repeat with `nextcloud.pgdump` and `nextcloud-postgres-0` in the `nextcloud` namespace. Finally delete the scratch folder: `sudo rm -rf /var/tmp/restore`.
+
+### 7. Start the apps and check
+
+Start Argo CD again. It brings every app back to its normal state.
+
+```bash
+kubectl -n argocd scale statefulset argocd-application-controller --replicas=1
+```
+
+Then check:
+
+- [ ] Immich opens on the tailnet
+- [ ] Old photos and videos open. The photo count matches the old server.
+- [ ] Albums and face groups are there (the database restored)
+- [ ] The phone app uploads a new photo to the new address
+- [ ] Nextcloud and Vaultwarden open, and your data is there
+- [ ] The nightly backup runs once on the new computer (`APPLY=1 ./platform/backup/install.sh`, then `sudo systemctl start homelab-backup.service`)
+
+Keep the old computer and its data until every box is ticked.

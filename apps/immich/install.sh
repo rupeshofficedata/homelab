@@ -1,36 +1,32 @@
 #!/usr/bin/env bash
-# install.sh - install or upgrade Immich on k3s (Phase 1a: manual Helm, no Argo yet).
-# Dry run unless APPLY=1. Idempotent: re-run to upgrade after editing values.yaml.
-source "$(dirname "$0")/../../bootstrap/scripts/lib.sh"
+# install.sh - install or upgrade Immich (photo library) on k3s.
+# Safe to run again: re-run it after you edit values.yaml to upgrade.
+# Preview by default. Use APPLY=1 to do it.
+HERE=$(cd "$(dirname "$0")" && pwd)
+source "$HERE/../../bootstrap/scripts/lib.sh"
 need kubectl helm sops openssl
 
-CHART_VERSION=0.13.4   # pinned; Renovate will propose bumps in Phase 1b
-HERE=$(cd "$(dirname "$0")" && pwd)
-SECRET_REL=secrets/immich-db.enc.yaml
-export KUBECONFIG=${KUBECONFIG:-$KUBECONFIG_OUT}
-export SOPS_AGE_KEY_FILE=$AGE_KEY_FILE
-cd "$REPO_DIR"
+CHART_VERSION=0.13.4          # version of the Immich Helm chart. Change it on purpose.
+SECRET_FILE=secrets/immich-db.enc.yaml
 
-run kubectl apply -f "$HERE/namespace.yaml"
-
-# 1. DB secret: generated once, committed ENCRYPTED. Plaintext never touches disk.
-if [[ ! -f $SECRET_REL ]]; then
-  log "creating $SECRET_REL"
-  if [[ $APPLY == 1 ]]; then
-    pw=$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9')
-    sops -e --filename-override "$SECRET_REL" --input-type yaml --output-type yaml /dev/stdin > "$SECRET_REL.tmp" <<YAML
+# The database login. Made once, then stored encrypted in git.
+database_secret() {
+  cat <<YAML
 apiVersion: v1
 kind: Secret
 metadata: {name: immich-db, namespace: immich}
-stringData: {host: immich-postgres, user: immich, dbname: immich, password: "$pw"}
+stringData: {host: immich-postgres, user: immich, dbname: immich, password: "$(random_password)"}
 YAML
-    mv "$SECRET_REL.tmp" "$SECRET_REL"
-  fi
-fi
-log "applying decrypted secret to the cluster (in memory only)"
-if [[ $APPLY == 1 ]]; then sops -d "$SECRET_REL" | kubectl apply -f -; fi
+}
 
-# 2. Volume + database, then the app.
+# 1. Namespace and database password
+run kubectl apply -f "$HERE/namespace.yaml"
+create_secret_file "$SECRET_FILE" database_secret
+apply_secret "$SECRET_FILE"
+
+# 2. Storage, database and network entry point
 run kubectl apply -f "$HERE/pvc.yaml" -f "$HERE/postgres.yaml" -f "$HERE/nodeport.yaml"
+
+# 3. The Immich app itself
 run helm upgrade --install immich oci://ghcr.io/immich-app/immich-charts/immich \
   --version "$CHART_VERSION" --namespace immich -f "$HERE/values.yaml"
