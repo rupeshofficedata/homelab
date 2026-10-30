@@ -282,3 +282,5 @@ A backup you have never restored is only a hope. Follow the restore drill in [ba
 ## Done when
 
 Every box above is ticked. Keep the restore drill on your calendar: repeat it after big upgrades.
+
+To check the server later, follow [health-check.md](health-check.md).

@@ -48,7 +48,7 @@ sudo restic -r /mnt/backup/homelab-restic --password-file /etc/homelab/restic-pa
 
 After you change `backup.sh`, run `install.sh` again. systemd runs the installed copy.
 
-How to restore: [docs/backup-restore.md](../../docs/backup-restore.md).
+How to restore: [docs/backup-restore.md](../../docs/backup-restore.md). How to check that it works: [docs/health-check.md](../../docs/health-check.md).
 
 ## Known limits
 
