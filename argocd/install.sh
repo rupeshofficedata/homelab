@@ -9,7 +9,7 @@ source "$HERE/../bootstrap/scripts/lib.sh"
 need kubectl sops openssl git
 
 # renovate: datasource=github-releases depName=argoproj/argo-cd
-ARGO_VERSION=v3.4.12   # check that this is still a supported release before you apply
+ARGO_VERSION=v3.5.6   # check that this is still a supported release before you apply
 SECRET_FILE=secrets/grafana-admin.enc.yaml
 
 grafana_secret() {
