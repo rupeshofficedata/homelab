@@ -24,7 +24,7 @@ spec:
       securityContext: {runAsUser: 1000, runAsGroup: 1000, fsGroup: 1000}
       containers:
         - name: vaultwarden
-          image: vaultwarden/server:1.37.4
+          image: vaultwarden/server:1.37.5
           ports: [{containerPort: 8080}]
           env:
             - {name: ROCKET_PORT, value: "8080"}
