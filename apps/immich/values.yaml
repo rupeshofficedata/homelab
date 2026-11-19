@@ -29,7 +29,7 @@ server:
             DB_DATABASE_NAME: {valueFrom: {secretKeyRef: {name: immich-db, key: dbname}}}
           resources:
             requests: {cpu: 100m, memory: 512Mi}
-            limits: {memory: 4Gi}   # 2Gi OOM-killed on upload + transcode + face jobs at once
+            limits: {memory: 6Gi}   # 4Gi OOM-killed 2026-11-19 (libvips thumbnails, ~3.7GB RSS)
 
 machine-learning:
   controllers:
