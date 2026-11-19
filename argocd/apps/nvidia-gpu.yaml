@@ -18,7 +18,13 @@ spec:
         releaseName: nvdp
         valuesObject:
           runtimeClassName: nvidia
-          affinity: null          # chart default needs node-feature-discovery labels we do not run
+          # chart default needs node-feature-discovery labels we do not run; match any linux node
+          affinity:
+            nodeAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                nodeSelectorTerms:
+                  - matchExpressions:
+                      - {key: kubernetes.io/os, operator: In, values: [linux]}
           config:
             default: default
             map:
