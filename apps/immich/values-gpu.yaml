@@ -1,0 +1,26 @@
+# GPU overlay for Immich (GTX 1080: CUDA machine-learning + NVENC transcoding).
+# TEMPORARY: the new PC has no GPU. At move time delete this file and
+# argocd/apps/nvidia-gpu.yaml (see docs/migrate-to-new-pc.md). Nothing else to edit.
+machine-learning:
+  controllers:
+    main:
+      pod: {runtimeClassName: nvidia}
+      containers:
+        main:
+          image:
+            # renovate: datasource=docker depName=ghcr.io/immich-app/immich-machine-learning
+            tag: v3.4.2-cuda
+          resources:
+            limits: {nvidia.com/gpu: 1}
+
+server:
+  controllers:
+    main:
+      pod: {runtimeClassName: nvidia}
+      containers:
+        main:
+          env:
+            NVIDIA_DRIVER_CAPABILITIES: all
+            NVIDIA_VISIBLE_DEVICES: all
+          resources:
+            limits: {nvidia.com/gpu: 1}

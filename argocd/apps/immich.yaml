@@ -15,7 +15,8 @@ spec:
       targetRevision: 0.13.4          # keep in step with CHART_VERSION in apps/immich/install.sh
       helm:
         releaseName: immich
-        valueFiles: [$values/apps/immich/values.yaml]
+        valueFiles: [$values/apps/immich/values.yaml, $values/apps/immich/values-gpu.yaml]
+        ignoreMissingValueFiles: true   # lets you drop the GPU overlay by deleting the file
     - repoURL: https://github.com/rupeshofficedata/homelab.git
       targetRevision: main
       ref: values

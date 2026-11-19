@@ -55,6 +55,19 @@ Plug in the drive. Then run the scripts from [getting-started.md](getting-starte
 
 If you have a separate big drive for media and files, mount it at `/srv/homelab/media` and `/srv/homelab/files` (in `/etc/fstab`) before you start the apps. No manifest changes are needed.
 
+### 3b. Drop the GPU setup (new PC has no GPU)
+
+The old PC runs Immich on its GTX 1080. The new PC is CPU only, so remove the GPU parts **before** step 4:
+
+```bash
+git rm apps/immich/values-gpu.yaml argocd/apps/nvidia-gpu.yaml apps/nvidia/runtimeclass.yaml
+git commit -m "chore: drop GPU overlay for CPU-only PC" && git push
+```
+
+Immich then goes back to the plain CPU images. Your data does not change: face and search data
+live in the database, transcoded videos live in the library. Do not install nvidia-container-toolkit on the new PC.
+In Immich Admin → Video Transcoding set Hardware Acceleration back to **Disabled**.
+
 ### 4. Argo CD and the apps
 
 ```bash

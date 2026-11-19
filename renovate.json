@@ -16,6 +16,7 @@
       "customType": "regex",
       "managerFilePatterns": [
         "/^apps/immich/values\\.yaml$/",
+        "/^apps/immich/values-gpu\\.yaml$/",
         "/^argocd/install\\.sh$/"
       ],
       "matchStrings": [
@@ -29,7 +30,8 @@
       "matchPackageNames": [
         "ghcr.io/immich-app/immich-server",
         "immich",
-        "ghcr.io/immich-app/immich-charts/immich"
+        "ghcr.io/immich-app/immich-charts/immich",
+        "ghcr.io/immich-app/immich-machine-learning"
       ],
       "groupName": "immich",
       "addLabels": [
@@ -42,7 +44,8 @@
       "matchPackageNames": [
         "ghcr.io/immich-app/immich-server",
         "immich",
-        "ghcr.io/immich-app/immich-charts/immich"
+        "ghcr.io/immich-app/immich-charts/immich",
+        "ghcr.io/immich-app/immich-machine-learning"
       ],
       "matchUpdateTypes": [
         "minor",

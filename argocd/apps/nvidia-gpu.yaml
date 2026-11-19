@@ -1,0 +1,36 @@
+# NVIDIA GPU support for k3s (device plugin + RuntimeClass). TEMPORARY: delete this
+# file when moving to the GPU-less PC. The finalizer removes everything it created.
+# Needs host setup first: nvidia-container-toolkit installed, k3s restarted.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nvidia-gpu
+  namespace: argocd
+  finalizers: [resources-finalizer.argocd.argoproj.io]
+spec:
+  project: default
+  destination: {server: https://kubernetes.default.svc, namespace: kube-system}
+  sources:
+    - repoURL: https://nvidia.github.io/k8s-device-plugin
+      chart: nvidia-device-plugin
+      targetRevision: 0.20.2
+      helm:
+        releaseName: nvdp
+        valuesObject:
+          runtimeClassName: nvidia
+          affinity: null          # chart default needs node-feature-discovery labels we do not run
+          config:
+            default: default
+            map:
+              default: |-
+                version: v1
+                sharing:
+                  timeSlicing:
+                    resources:
+                      - name: nvidia.com/gpu
+                        replicas: 2   # Immich server + ML share the one GPU
+    - repoURL: https://github.com/rupeshofficedata/homelab.git
+      targetRevision: main
+      path: apps/nvidia
+  syncPolicy:
+    automated: {prune: true, selfHeal: true}
