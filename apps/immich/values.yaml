@@ -38,4 +38,4 @@ machine-learning:
         main:
           resources:
             requests: {cpu: 100m, memory: 512Mi}
-            limits: {memory: 2Gi}   # RAM guard: face/search models can balloon
+            limits: {memory: 3Gi}   # RAM guard; 2Gi OOM-killed at smartSearch=4/ocr=2 (2026-11-19)
