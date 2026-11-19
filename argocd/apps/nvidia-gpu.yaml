@@ -1,4 +1,4 @@
-# NVIDIA GPU support for k3s (device plugin + RuntimeClass). TEMPORARY: delete this
+# NVIDIA GPU support for k3s (device plugin; k3s already provides the `nvidia` RuntimeClass). TEMPORARY: delete this
 # file when moving to the GPU-less PC. The finalizer removes everything it created.
 # Needs host setup first: nvidia-container-toolkit installed, k3s restarted.
 apiVersion: argoproj.io/v1alpha1
@@ -29,8 +29,5 @@ spec:
                     resources:
                       - name: nvidia.com/gpu
                         replicas: 2   # Immich server + ML share the one GPU
-    - repoURL: https://github.com/rupeshofficedata/homelab.git
-      targetRevision: main
-      path: apps/nvidia
   syncPolicy:
     automated: {prune: true, selfHeal: true}

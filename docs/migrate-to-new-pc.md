@@ -60,7 +60,7 @@ If you have a separate big drive for media and files, mount it at `/srv/homelab/
 The old PC runs Immich on its GTX 1080. The new PC is CPU only, so remove the GPU parts **before** step 4:
 
 ```bash
-git rm apps/immich/values-gpu.yaml argocd/apps/nvidia-gpu.yaml apps/nvidia/runtimeclass.yaml
+git rm apps/immich/values-gpu.yaml argocd/apps/nvidia-gpu.yaml
 git commit -m "chore: drop GPU overlay for CPU-only PC" && git push
 ```
 
