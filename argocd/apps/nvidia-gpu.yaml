@@ -34,6 +34,6 @@ spec:
                   timeSlicing:
                     resources:
                       - name: nvidia.com/gpu
-                        replicas: 2   # Immich server + ML share the one GPU
+                        replicas: 3   # server + ML + one extra so a rolling update can start the new pod before the old one stops
   syncPolicy:
     automated: {prune: true, selfHeal: true}
