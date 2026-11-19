@@ -16,6 +16,7 @@ Each page explains the idea first, then the commands.
 | Check that everything works, and fix it | [health-check.md](health-check.md) |
 | Know your data is safe, and restore it | [backup-restore.md](backup-restore.md) |
 | Move everything to another computer | [migrate-to-new-pc.md](migrate-to-new-pc.md) |
+| Use the GPU, auto-update Immich, tune jobs | [immich-gpu.md](immich-gpu.md) |
 | See what is built and what is next | [roadmap.md](roadmap.md) |
 
 ## Quick answers
