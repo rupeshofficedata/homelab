@@ -25,7 +25,7 @@
   ],
   "packageRules": [
     {
-      "description": "Immich server and its chart move together: one PR, labelled for a backup first",
+      "description": "Immich server and chart move together: one PR. Minor/patch auto-merge after 3 days; majors stay manual. Nightly restic backup is the safety net.",
       "matchPackageNames": [
         "ghcr.io/immich-app/immich-server",
         "immich",
@@ -34,7 +34,21 @@
       "groupName": "immich",
       "addLabels": [
         "backup-first"
-      ]
+      ],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Auto-merge immich minor/patch",
+      "matchPackageNames": [
+        "ghcr.io/immich-app/immich-server",
+        "immich",
+        "ghcr.io/immich-app/immich-charts/immich"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true
     },
     {
       "description": "Postgres image carries the vector extensions; major jumps need a manual dump/restore",
