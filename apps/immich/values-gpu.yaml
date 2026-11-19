@@ -10,6 +10,8 @@ machine-learning:
           image:
             # renovate: datasource=docker depName=ghcr.io/immich-app/immich-machine-learning
             tag: v3.4.2-cuda
+          env:
+            MACHINE_LEARNING_MODEL_TTL: "60"   # unload idle models after 60s (default 300) so VRAM is freed; 8GB card is shared with the desktop
           resources:
             limits: {nvidia.com/gpu: 1}
 
